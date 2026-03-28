@@ -1,7 +1,7 @@
 # backend/routes/moderation.py
 
 from fastapi import APIRouter, HTTPException, Query
-from supabase_client import supabase
+from core.database import supabase
 from services.blockchain import get_case_from_chain, get_case_count
 
 router = APIRouter(prefix="/moderation", tags=["Moderation"])

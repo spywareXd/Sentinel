@@ -23,7 +23,7 @@ async def scan_unprocessed():
         
         print(f"\n📨 Found {len(messages)} unprocessed messages")
         
-        from services.ai_scanner import scan
+        from services.scanner import scan
         
         for msg in messages:
             print(f"🆕 Scanning: {msg['content'][:40]}...")
@@ -68,7 +68,7 @@ async def scan_unprocessed():
                     .execute()
                 
                 if not existing.data:
-                    from services.dao_moderation import create_moderation_case
+                    from services.moderation import create_moderation_case
                     
                     case_result = create_moderation_case(
                         message_id=msg["id"],
@@ -93,7 +93,7 @@ async def scan_unprocessed():
 async def check_resolved():
     """Check blockchain for resolved cases and update Supabase"""
     try:
-        from services.dao_moderation import check_and_update_resolved_cases
+        from services.moderation import check_and_update_resolved_cases
         check_and_update_resolved_cases()
     except Exception as e:
         print(f"❌ Error checking resolved: {e}")

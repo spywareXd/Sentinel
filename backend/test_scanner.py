@@ -1,6 +1,6 @@
 import sys
 import json
-from services.ai_scanner import scan
+from services.scanner import scan
 
 def main():
     print("Testing Safe Message:")
