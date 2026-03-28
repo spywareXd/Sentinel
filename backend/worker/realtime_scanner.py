@@ -1,21 +1,8 @@
 # backend/scanner_loop.py
 
 import asyncio
-from supabase import create_client, Client
-from dotenv import load_dotenv
-import os
+from core.database import supabase
 from datetime import datetime, timezone, timedelta
-
-# Load .env FIRST
-load_dotenv()
-
-url = os.getenv("SUPABASE_URL") or "https://qtgpcpflcrgrkvffozds.supabase.co"
-service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0Z3BjcGZsY3Jncmt2ZmZvemRzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDk1MDc0NCwiZXhwIjoyMDg2NTI2NzQ0fQ.ZXdbcClBxUHk1pUy7crEjDeEWOb07DthYsKOd8GbLIE"
-
-print(f"🔗 URL: {url[:30]}...")
-print(f"🔑 Service key loaded: {'✅' if service_key else '❌ MISSING'}")
-
-supabase: Client = create_client(url, service_key)
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -36,7 +23,7 @@ async def scan_unprocessed():
         
         print(f"\n📨 Found {len(messages)} unprocessed messages")
         
-        from services.scanner import scan
+        from services.ai_scanner import scan
         
         for msg in messages:
             print(f"🆕 Scanning: {msg['content'][:40]}...")
@@ -81,7 +68,7 @@ async def scan_unprocessed():
                     .execute()
                 
                 if not existing.data:
-                    from services.moderation import create_moderation_case
+                    from services.dao_moderation import create_moderation_case
                     
                     case_result = create_moderation_case(
                         message_id=msg["id"],
@@ -106,7 +93,7 @@ async def scan_unprocessed():
 async def check_resolved():
     """Check blockchain for resolved cases and update Supabase"""
     try:
-        from services.moderation import check_and_update_resolved_cases
+        from services.dao_moderation import check_and_update_resolved_cases
         check_and_update_resolved_cases()
     except Exception as e:
         print(f"❌ Error checking resolved: {e}")

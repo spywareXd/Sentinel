@@ -3,18 +3,7 @@
 from web3 import Web3
 import json
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# --- Config ---
-RPC_URL = os.getenv("RPC_URL", "https://eth-sepolia.g.alchemy.com/v2/fIBOmvk-cdsiUFKkjLNUQ")
-CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS", "0xc24c387C5654566B3C53bD69913d78acd20CB35E")
-OWNER_PRIVATE_KEY = os.getenv("OWNER_PRIVATE_KEY", "d4cecd61886be0011f2ccfada678d00d2019ee7bca584ad40e5ee1b79608f99b")
-
-# Add 0x prefix if missing
-if not OWNER_PRIVATE_KEY.startswith("0x"):
-    OWNER_PRIVATE_KEY = "0x" + OWNER_PRIVATE_KEY
+from core.config import RPC_URL, CONTRACT_ADDRESS, OWNER_PRIVATE_KEY
 
 # --- Web3 Setup ---
 w3 = Web3(Web3.HTTPProvider(RPC_URL))

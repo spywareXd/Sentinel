@@ -2,9 +2,9 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from supabase_client import supabase
-from services.scanner import scan
-from routes.moderation import router as moderation_router
+from core.database import supabase
+from services.ai_scanner import scan
+from api.routes.moderation import router as moderation_router
 
 app = FastAPI(title="Sentinel Backend")
 
