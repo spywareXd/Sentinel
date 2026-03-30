@@ -2,7 +2,14 @@
 __pycache__/  
 *.py[codz]  
 *$py.class  
-  
+
+
+node_modules/
+.next/
+.env
+dist/
+build/
+
 # C extensions  
 *.so  
   
