@@ -9,8 +9,8 @@ from core.config import RPC_URL, CONTRACT_ADDRESS, OWNER_PRIVATE_KEY
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
 OWNER_ADDRESS = w3.eth.account.from_key(OWNER_PRIVATE_KEY).address
-print(f"🔗 Web3 connected: {w3.is_connected()}")
-print(f"🏠 Owner address: {OWNER_ADDRESS}")
+print(f"Web3 connected: {w3.is_connected()}")
+print(f"Owner address: {OWNER_ADDRESS}")
 
 # --- Contract ABI (only the functions we need) ---
 CONTRACT_ABI = [
@@ -127,7 +127,7 @@ def create_case_on_chain(message_hash_hex: str, offender_address: str, moderator
         signed_tx = w3.eth.account.sign_transaction(tx, OWNER_PRIVATE_KEY)
         tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         
-        print(f"📤 TX sent: {tx_hash.hex()}")
+        print(f"TX sent: {tx_hash.hex()}")
         
         # Wait for receipt
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
@@ -137,7 +137,7 @@ def create_case_on_chain(message_hash_hex: str, offender_address: str, moderator
             logs = contract.events.CaseCreated().process_receipt(receipt)
             case_id = logs[0]['args']['caseId'] if logs else None
             
-            print(f"✅ Case created on-chain! Case ID: {case_id}")
+            print(f"Case created on-chain. Case ID: {case_id}")
             print(f"   TX: https://sepolia.etherscan.io/tx/{tx_hash.hex()}")
             
             return {
@@ -147,11 +147,11 @@ def create_case_on_chain(message_hash_hex: str, offender_address: str, moderator
                 "block_number": receipt.blockNumber
             }
         else:
-            print(f"❌ TX failed! Receipt: {receipt}")
+            print(f"TX failed. Receipt: {receipt}")
             return {"success": False, "error": "Transaction reverted", "tx_hash": tx_hash.hex()}
             
     except Exception as e:
-        print(f"❌ Blockchain error: {e}")
+        print(f"Blockchain error: {e}")
         return {"success": False, "error": str(e)}
 
 
@@ -169,7 +169,7 @@ def get_case_from_chain(case_id: int) -> dict:
             "created_at": result[6]
         }
     except Exception as e:
-        print(f"❌ Error reading case {case_id}: {e}")
+        print(f"Error reading case {case_id}: {e}")
         return None
 
 
@@ -178,7 +178,7 @@ def get_case_count() -> int:
     try:
         return contract.functions.caseCount().call()
     except Exception as e:
-        print(f"❌ Error getting case count: {e}")
+        print(f"Error getting case count: {e}")
         return 0
 
 
@@ -201,5 +201,5 @@ def check_resolved_cases(from_block: int = None) -> list:
         
         return resolved
     except Exception as e:
-        print(f"❌ Error checking resolved cases: {e}")
+        print(f"Error checking resolved cases: {e}")
         return []
