@@ -35,7 +35,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/chat')
+  redirect('/')
 }
 
 export async function signup(formData: FormData) {
