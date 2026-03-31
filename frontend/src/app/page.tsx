@@ -8,9 +8,10 @@ import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import { currentUser } from "@/mockdata/user";
 import type { Message } from "@/types/mockdata/chat";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/utils/supabase/client";
 
 export default function Home() {
+  const supabase = createClient();
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -67,7 +68,7 @@ export default function Home() {
             // Temporarily return unchanged; the async fetch below will effectively append it
             return currentMessages;
           });
-          
+
           const { data: profileData } = await supabase
             .from("profiles")
             .select("username")
