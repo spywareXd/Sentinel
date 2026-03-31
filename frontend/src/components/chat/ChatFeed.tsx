@@ -11,7 +11,7 @@ const toneClassMap = {
 export default function ChatFeed() {
   return (
     <section className="premium-scrollbar flex min-w-0 min-h-0 flex-1 flex-col overflow-y-auto px-6 py-6">
-      <div className="flex flex-col">
+      <div className="flex min-h-full flex-col ">
         <div className="mb-6 flex items-center gap-4 py-4">
           <div className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--outline-variant)_20%,transparent)]" />
           <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[color:color-mix(in_srgb,var(--on-surface-variant)_70%,transparent)]">

@@ -1,23 +1,5 @@
 import { profileLogos } from "@/mockdata/profileLogos";
-
-export type MessageTone = "primary" | "secondary" | "tertiary" | "self";
-
-export type Message = {
-  id: number;
-  author: string;
-  authorInitials: string;
-  authorLogoUrl?: string | null;
-  time: string;
-  text: string;
-  tone: MessageTone;
-  grouped?: boolean;
-};
-
-export type FeedMeta = {
-  dayLabel: string;
-  composerPlaceholder: string;
-  helperText: string;
-};
+import type { FeedMeta, Message } from "@/types/mockdata/chat";
 
 export const feedMeta: FeedMeta = {
   dayLabel: "Today",
@@ -184,8 +166,8 @@ export const messages: Message[] = [
   },
   {
     id: 18,
-    author: "You",
-    authorInitials: "Y",
+    author: "Arnav",
+    authorInitials: "A",
     authorLogoUrl: profileLogos.arnav,
     time: "10:45 AM",
     text: "someone clip the original context",
