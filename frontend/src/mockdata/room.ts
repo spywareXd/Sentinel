@@ -1,9 +1,6 @@
 import { profileLogos } from "@/mockdata/profileLogos";
-import type {
-  PreviousCasesItems,
-  RoomDetails,
-  RoomMember,
-} from "@/types/mockdata/room";
+import { caseRecords } from "@/mockdata/cases";
+import type { RoomDetails, RoomMember } from "@/types/mockdata/room";
 
 export const roomDetails: RoomDetails = {
   heading: "Room Details",
@@ -44,17 +41,4 @@ export const roomMembers: RoomMember[] = [
   },
 ];
 
-export const previousCasesItems: PreviousCasesItems[] = [
-  {
-    title: "Case #214 • Dismissed",
-    subtitle: "trash-talk report closed yesterday",
-  },
-  {
-    title: "Case #198 • Punished",
-    subtitle: "direct self-harm message removed",
-  },
-  {
-    title: "Case #176 • Resolved",
-    subtitle: "hate-speech vote finalized",
-  },
-]
+export const previousCases = caseRecords.slice(0, 3);

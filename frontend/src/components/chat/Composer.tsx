@@ -1,8 +1,27 @@
+"use client";
+
+import { useState } from "react";
 import { AtSign, PlusCircle, Send, Smile } from "lucide-react";
 import { feedMeta } from "@/mockdata/chat";
 import { typingUser } from "@/mockdata/user";
 
-export default function Composer() {
+type ComposerProps = {
+  onSend: (text: string) => void;
+};
+
+export default function Composer({ onSend }: ComposerProps) {
+  const [draft, setDraft] = useState("");
+  const isDrafting = draft.trim().length > 0;
+
+  const submitMessage = () => {
+    const trimmedDraft = draft.trim();
+
+    if (!trimmedDraft) return;
+
+    onSend(trimmedDraft);
+    setDraft("");
+  };
+
   return (
     <footer className="shrink-0 bg-[var(--background)] px-6 py-5">
       <div className="w-full">
@@ -15,6 +34,14 @@ export default function Composer() {
             <input
               type="text"
               placeholder={feedMeta.composerPlaceholder}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submitMessage();
+                }
+              }}
               className="flex-1 bg-transparent text-sm text-[var(--on-surface)] outline-none placeholder:text-[color:color-mix(in_srgb,var(--on-surface-variant)_40%,transparent)]"
             />
 
@@ -25,7 +52,11 @@ export default function Composer() {
               <button className="text-[var(--on-surface-variant)] transition-colors hover:text-[var(--primary)]">
                 <AtSign className="h-5 w-5" />
               </button>
-              <button className="rounded-lg bg-[var(--primary)] p-2 text-[#07006c] transition-opacity hover:opacity-90">
+              <button
+                onClick={submitMessage}
+                disabled={!draft.trim()}
+                className="rounded-lg bg-[var(--primary)] p-2 text-[#07006c] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+              >
                 <Send className="h-4 w-4" />
               </button>
             </div>
@@ -40,7 +71,7 @@ export default function Composer() {
           <div className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             <p className="text-[10px] text-[color:color-mix(in_srgb,var(--on-surface-variant)_70%,transparent)]">
-              {typingUser.name} is typing...
+              {isDrafting ? "You are typing..." : `${typingUser.name} is typing...`}
             </p>
           </div>
         </div>

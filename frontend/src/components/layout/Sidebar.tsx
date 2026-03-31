@@ -1,12 +1,15 @@
+"use client";
+
 import {
   Gavel,
   HelpCircle,
   Home,
-  Layers3,
   Settings,
   Shield,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import ProfileLogo from "@/components/ui/ProfileLogo";
 import { currentUser } from "@/mockdata/user";
 
@@ -17,10 +20,10 @@ const sidebarBrand = {
 };
 
 const navItems = [
-  { label: "Feed", icon: "home", active: true },
-  { label: "Cases", icon: "shield", active: false },
-  { label: "Activity", icon: "gavel", active: false },
-  { label: "Settings", icon: "settings", active: false },
+  { label: "Feed", icon: "home", href: "/" },
+  { label: "Cases", icon: "shield", href: "/cases" },
+  { label: "Activity", icon: "gavel", href: "#" },
+  { label: "Settings", icon: "settings", href: "#" },
 ] as const;
 
 const iconMap = {
@@ -28,13 +31,14 @@ const iconMap = {
   shield: Shield,
   gavel: Gavel,
   sparkles: Sparkles,
-  layers: Layers3,
   settings: Settings,
 } as const;
 
 export default function Sidebar() {
+  const pathname = usePathname();
+
   return (
-    <aside className="flex h-screen w-64 flex-col bg-[var(--surface-container)] px-4 py-4 text-[var(--on-surface)]">
+    <aside className="flex h-screen w-64 shrink-0 flex-col bg-[var(--surface-container)] px-4 py-4 text-[var(--on-surface)]">
       <div className="mb-8 flex items-center gap-3 px-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-container)] text-[#07006c] shadow-[0_12px_30px_rgba(128,131,255,0.22)]">
           <Shield className="h-5 w-5" />
@@ -58,20 +62,22 @@ export default function Sidebar() {
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {
           const Icon = iconMap[item.icon];
+          const isActive = item.href !== "#" && pathname === item.href;
 
           return (
-            <button
+            <Link
               key={item.label}
+              href={item.href}
               className={[
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
-                item.active
+                isActive
                   ? "bg-[var(--surface-container-high)] text-[var(--primary)]"
                   : "text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]",
               ].join(" ")}
             >
               <Icon className="h-4 w-4" />
               <span className="font-medium">{item.label}</span>
-            </button>
+            </Link>
           );
         })}
       </nav>

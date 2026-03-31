@@ -225,3 +225,6 @@ stitch (1)/
 
 #mac specific
 .DS_Store
+
+#old repo
+context/

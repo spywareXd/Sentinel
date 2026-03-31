@@ -1,14 +1,37 @@
-import { Bell, Info, Search, Star, Users } from "lucide-react";
+"use client";
+
+import {
+  FileText,
+  LayoutPanelTop,
+  Search,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
 
 const topbarConfig = {
   title: "Global Feed",
   symbol: "#",
   searchPlaceholder: "Search message history...",
-  tabs: ["Threads", "Mentions", "Drafts"],
+  tabs: ["Threads"],
   activeTab: "Threads",
 };
 
-export default function Topbar() {
+type TopbarProps = {
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
+};
+
+export default function Topbar({
+  searchQuery,
+  onSearchChange,
+}: TopbarProps) {
+  const scrollToRightRailSection = (sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   return (
     <header className="flex h-16 items-center justify-between bg-[color:color-mix(in_srgb,var(--background)_60%,transparent)] px-6 backdrop-blur-xl">
       <div className="flex items-center gap-4">
@@ -44,22 +67,44 @@ export default function Topbar() {
           <input
             type="text"
             placeholder={topbarConfig.searchPlaceholder}
+            value={searchQuery}
+            onChange={(event) => onSearchChange(event.target.value)}
             className="w-64 rounded-full bg-[var(--surface-container-lowest)] py-2 pl-9 pr-4 text-xs text-[var(--on-surface)] outline-none placeholder:text-[color:color-mix(in_srgb,var(--on-surface-variant)_50%,transparent)]"
           />
         </div>
 
         <div className="flex items-center gap-1">
-          <button className="rounded-md p-2 text-[var(--primary)] transition-colors hover:bg-white/5">
-            <Info className="h-4 w-4" />
+          <button
+            onClick={() => scrollToRightRailSection("room-about")}
+            className="rounded-md p-2 text-[var(--primary)] transition-colors hover:bg-white/5"
+            aria-label="Scroll to room about"
+            title="About"
+          >
+            <FileText className="h-4 w-4" />
           </button>
-          <button className="rounded-md p-2 text-[var(--primary)] transition-colors hover:bg-white/5">
+          <button
+            onClick={() => scrollToRightRailSection("room-participants")}
+            className="rounded-md p-2 text-[var(--primary)] transition-colors hover:bg-white/5"
+            aria-label="Scroll to participants"
+            title="Participants"
+          >
             <Users className="h-4 w-4" />
           </button>
-          <button className="rounded-md p-2 text-[var(--primary)] transition-colors hover:bg-white/5">
-            <Star className="h-4 w-4" />
+          <button
+            onClick={() => scrollToRightRailSection("room-previous-cases")}
+            className="rounded-md p-2 text-[var(--primary)] transition-colors hover:bg-white/5"
+            aria-label="Scroll to previous cases"
+            title="Previous Cases"
+          >
+            <ShieldAlert className="h-4 w-4" />
           </button>
-          <button className="rounded-md p-2 text-[var(--primary)] transition-colors hover:bg-white/5">
-            <Bell className="h-4 w-4" />
+          <button
+            onClick={() => scrollToRightRailSection("room-details-top")}
+            className="rounded-md p-2 text-[var(--primary)] transition-colors hover:bg-white/5"
+            aria-label="Scroll to top of room details"
+            title="Room Details"
+          >
+            <LayoutPanelTop className="h-4 w-4" />
           </button>
         </div>
       </div>
