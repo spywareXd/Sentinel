@@ -9,66 +9,27 @@ import Sidebar from "@/components/layout/Sidebar";
 import { caseRecords } from "@/mockdata/cases";
 import type { CaseDecision, CaseRecord } from "@/types/mockdata/cases";
 
-type TopTab = "Active" | "Pending" | "Resolved";
-type QueueFilter = "Assigned" | "Active" | "Resolved" | "All";
+type TopTab = "Assigned" | "History";
 
 const createInitialCases = () => caseRecords.map((caseItem) => ({ ...caseItem }));
 
-const getTopTabForQueueFilter = (filter: QueueFilter): TopTab => {
-  if (filter === "Resolved") return "Resolved";
-  if (filter === "Active") return "Active";
-  return "Pending";
-};
-
-const getQueueFilterForTopTab = (tab: TopTab): QueueFilter => {
-  if (tab === "Resolved") return "Resolved";
-  if (tab === "Active") return "Active";
-  return "Assigned";
-};
-
 export default function CasesPage() {
   const [cases, setCases] = useState<CaseRecord[]>(createInitialCases);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTopTab, setActiveTopTab] = useState<TopTab>("Pending");
-  const [queueFilter, setQueueFilter] = useState<QueueFilter>("Assigned");
-  const [quickFilters, setQuickFilters] = useState({
-    highSeverity: false,
-    needsVote: false,
-  });
+  const [activeTopTab, setActiveTopTab] = useState<TopTab>("Assigned");
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(
     caseRecords[0]?.id ?? null,
   );
+  const [isDetailDismissed, setIsDetailDismissed] = useState(false);
   const detailPanelRef = useRef<HTMLDivElement | null>(null);
 
   const filteredCases = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-
     return cases
       .filter((caseItem) => {
-      if (activeTopTab === "Active" && caseItem.status !== "Voting") return false;
-      if (activeTopTab === "Pending" && caseItem.status === "Resolved") return false;
-      if (activeTopTab === "Resolved" && caseItem.status !== "Resolved") return false;
+        if (activeTopTab === "Assigned") {
+          return caseItem.assignedToMe;
+        }
 
-      if (queueFilter === "Assigned" && !caseItem.assignedToMe) return false;
-      if (queueFilter === "Active" && caseItem.status === "Resolved") return false;
-      if (queueFilter === "Resolved" && caseItem.status !== "Resolved") return false;
-
-      if (quickFilters.highSeverity && caseItem.severity !== "High") return false;
-      if (quickFilters.needsVote && !caseItem.needsVote) return false;
-
-      if (!normalizedQuery) return true;
-
-      const searchableText = [
-        caseItem.number,
-        caseItem.title,
-        caseItem.offender,
-        caseItem.reporter,
-        caseItem.aiReason,
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return searchableText.includes(normalizedQuery);
+        return caseItem.status === "Resolved" && caseItem.wasAssignedToMe;
       })
       .sort((left, right) => {
         if (left.status === "Resolved" && right.status !== "Resolved") return 1;
@@ -77,7 +38,7 @@ export default function CasesPage() {
         if (!left.assignedToMe && right.assignedToMe) return 1;
         return right.harmfulScore - left.harmfulScore;
       });
-  }, [activeTopTab, cases, queueFilter, quickFilters, searchQuery]);
+  }, [activeTopTab, cases]);
 
   const selectedCase =
     (selectedCaseId
@@ -88,10 +49,7 @@ export default function CasesPage() {
   const summary = useMemo(
     () => ({
       assigned: cases.filter((caseItem) => caseItem.assignedToMe).length,
-      activeVoting: cases.filter((caseItem) => caseItem.status !== "Resolved").length,
       resolved: cases.filter((caseItem) => caseItem.status === "Resolved").length,
-      punished: cases.filter((caseItem) => caseItem.decision === "Punished").length,
-      dismissed: cases.filter((caseItem) => caseItem.decision === "Dismissed").length,
     }),
     [cases],
   );
@@ -111,16 +69,11 @@ export default function CasesPage() {
           decision,
           resolvedAt: "Resolved just now",
           assignedToMe: false,
+          wasAssignedToMe: true,
           needsVote: false,
           outcome: isPunish
             ? "Case resolved with punishment after your vote pushed the room to a final decision."
             : "Case resolved with dismissal after your vote closed the review in favor of no punishment.",
-          notes: [
-            isPunish
-              ? "You voted to punish and the case closed immediately."
-              : "You voted to dismiss and the case closed immediately.",
-            ...caseItem.notes,
-          ],
         };
       }),
     );
@@ -137,6 +90,7 @@ export default function CasesPage() {
         !detailPanelRef.current.contains(event.target) &&
         !event.target.closest("[data-case-list-root='true']")
       ) {
+        setIsDetailDismissed(true);
         setSelectedCaseId(null);
       }
     };
@@ -148,16 +102,26 @@ export default function CasesPage() {
     };
   }, [selectedCaseId]);
 
+  useEffect(() => {
+    if (filteredCases.length === 0) {
+      setSelectedCaseId(null);
+      return;
+    }
+
+    if (isDetailDismissed && !selectedCaseId) {
+      return;
+    }
+
+    if (!selectedCaseId || !filteredCases.some((caseItem) => caseItem.id === selectedCaseId)) {
+      setSelectedCaseId(filteredCases[0].id);
+    }
+  }, [filteredCases, isDetailDismissed, selectedCaseId]);
+
   const resetCases = () => {
     setCases(createInitialCases());
     setSelectedCaseId(caseRecords[0]?.id ?? null);
-    setActiveTopTab("Pending");
-    setQueueFilter("Assigned");
-    setQuickFilters({
-      highSeverity: false,
-      needsVote: false,
-    });
-    setSearchQuery("");
+    setIsDetailDismissed(false);
+    setActiveTopTab("Assigned");
   };
 
   return (
@@ -166,12 +130,10 @@ export default function CasesPage() {
 
       <main className="ml-0 flex min-h-0 min-w-0 flex-1 flex-col">
         <CasesHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
           activeTopTab={activeTopTab}
           onTopTabChange={(tab) => {
             setActiveTopTab(tab);
-            setQueueFilter(getQueueFilterForTopTab(tab));
+            setIsDetailDismissed(false);
           }}
         />
 
@@ -184,7 +146,7 @@ export default function CasesPage() {
                     Cases
                   </h3>
                   <p className="text-[var(--on-surface-variant)]">
-                    Live moderation queue and community archive •{" "}
+                    Only your assigned queue and your past decisions live here •{" "}
                     <span className="font-semibold text-[var(--primary)]">
                       {summary.assigned} assigned to you
                     </span>
@@ -204,19 +166,10 @@ export default function CasesPage() {
             <CaseList
               cases={filteredCases}
               selectedCaseId={selectedCase?.id ?? ""}
-              onSelectCase={setSelectedCaseId}
-              queueFilter={queueFilter}
-              onQueueFilterChange={(filter) => {
-                setQueueFilter(filter);
-                setActiveTopTab(getTopTabForQueueFilter(filter));
+              onSelectCase={(caseId) => {
+                setSelectedCaseId(caseId);
+                setIsDetailDismissed(false);
               }}
-              quickFilters={quickFilters}
-              onToggleQuickFilter={(filter) =>
-                setQuickFilters((prev) => ({
-                  ...prev,
-                  [filter]: !prev[filter],
-                }))
-              }
             />
           </div>
 

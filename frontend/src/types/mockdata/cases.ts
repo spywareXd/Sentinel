@@ -15,6 +15,7 @@ export type CaseRecord = {
   openedAt: string;
   resolvedAt?: string;
   assignedToMe: boolean;
+  wasAssignedToMe: boolean;
   needsVote: boolean;
   harmfulScore: number;
   aiReason: string;
@@ -25,5 +26,4 @@ export type CaseRecord = {
   voteBreakdown: string;
   outcome: string;
   chainRef: string;
-  notes: string[];
 };

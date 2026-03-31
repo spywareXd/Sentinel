@@ -1,24 +1,16 @@
 type CasesSummaryStripProps = {
   assigned: number;
-  activeVoting: number;
   resolved: number;
-  punished: number;
-  dismissed: number;
 };
 
-const summaryItems = (
-  counts: CasesSummaryStripProps,
-) => [
+const summaryItems = (counts: CasesSummaryStripProps) => [
   { label: "Assigned to Me", value: counts.assigned, tone: "text-[var(--primary)]" },
-  { label: "Active Voting", value: counts.activeVoting, tone: "text-[var(--secondary)]" },
   { label: "Resolved", value: counts.resolved, tone: "text-[var(--on-surface)]" },
-  { label: "Punished", value: counts.punished, tone: "text-[var(--tertiary)]" },
-  { label: "Dismissed", value: counts.dismissed, tone: "text-[var(--on-surface-variant)]" },
 ];
 
 export default function CasesSummaryStrip(props: CasesSummaryStripProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {summaryItems(props).map((item) => (
         <div
           key={item.label}

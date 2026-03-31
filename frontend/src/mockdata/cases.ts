@@ -11,6 +11,7 @@ export const caseRecords: CaseRecord[] = [
     decision: null,
     openedAt: "Opened 12m ago",
     assignedToMe: true,
+    wasAssignedToMe: true,
     needsVote: true,
     harmfulScore: 0.92,
     aiReason: "Toxic language with implied doxxing threat",
@@ -24,11 +25,6 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Case is still active. Current consensus leans strongly toward punishment, but quorum has not been fully reached yet.",
     chainRef: "0X82...F2E1",
-    notes: [
-      "Assigned to you and one other pending juror.",
-      "Offender has prior moderation history in this room.",
-      "Urgency elevated because threat language moved beyond trash talk.",
-    ],
   },
   {
     id: "case-9281",
@@ -40,6 +36,7 @@ export const caseRecords: CaseRecord[] = [
     decision: null,
     openedAt: "Opened 45m ago",
     assignedToMe: false,
+    wasAssignedToMe: false,
     needsVote: false,
     harmfulScore: 0.39,
     aiReason: "Manual flag after repeated taunts in a match thread",
@@ -53,11 +50,6 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Still in voting. Current sentiment suggests dismissal unless new context shows targeted harassment.",
     chainRef: "0X42...A911",
-    notes: [
-      "Low-severity queue item with mixed community opinion.",
-      "Useful as a contrast case against more severe self-harm reports.",
-      "No direct threat or protected-class language detected.",
-    ],
   },
   {
     id: "case-9270",
@@ -70,6 +62,7 @@ export const caseRecords: CaseRecord[] = [
     openedAt: "Opened 2h ago",
     resolvedAt: "Resolved 94m ago",
     assignedToMe: false,
+    wasAssignedToMe: true,
     needsVote: false,
     harmfulScore: 0.88,
     aiReason: "Severe hateful-conduct indicators against a protected group",
@@ -83,11 +76,6 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Case resolved with punishment after jurors reviewed the original message and follow-up replies. The decision remains visible for transparency review.",
     chainRef: "0X91...DD42",
-    notes: [
-      "Consensus crossed threshold quickly after context review.",
-      "Supporting follow-up messages reinforced the severity.",
-      "Case remains archived as a reference example for future review.",
-    ],
   },
   {
     id: "case-9264",
@@ -99,6 +87,7 @@ export const caseRecords: CaseRecord[] = [
     decision: null,
     openedAt: "Opened 4m ago",
     assignedToMe: true,
+    wasAssignedToMe: true,
     needsVote: true,
     harmfulScore: 0.98,
     aiReason: "Direct self-harm encouragement with explicit second-person targeting",
@@ -112,11 +101,6 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Case has just entered jury review. This one requires immediate attention because the language is unambiguous.",
     chainRef: "0X77...C108",
-    notes: [
-      "Highest-priority case in your current queue.",
-      "Room context has already been captured in screenshots.",
-      "One vote has been cast and the remaining jurors are pending.",
-    ],
   },
   {
     id: "case-9258",
@@ -129,6 +113,7 @@ export const caseRecords: CaseRecord[] = [
     openedAt: "Opened 7h ago",
     resolvedAt: "Resolved 6h ago",
     assignedToMe: false,
+    wasAssignedToMe: true,
     needsVote: false,
     harmfulScore: 0.27,
     aiReason: "Repeated posting pattern but no abusive content",
@@ -142,10 +127,5 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Resolved with dismissal and no account penalty. Message stayed visible but moderators noted the pattern for future spam escalation.",
     chainRef: "0X11...B812",
-    notes: [
-      "Dismissed because the content was annoying, not harmful.",
-      "Shows the system should not over-punish low-risk disruptions.",
-      "Useful benchmark for proportional moderation decisions.",
-    ],
   },
 ];

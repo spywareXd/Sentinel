@@ -15,11 +15,6 @@ export default function CaseInsightSection({ caseItem }: CaseInsightSectionProps
           {caseItem.aiReason}
         </p>
       </div>
-      <div className="rounded-2xl bg-[color:color-mix(in_srgb,var(--surface-container-high)_55%,transparent)] p-4">
-        <p className="text-sm leading-7 text-[var(--on-surface)]">
-          {caseItem.summary}
-        </p>
-      </div>
     </div>
   );
 }

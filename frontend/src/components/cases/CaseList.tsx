@@ -1,22 +1,11 @@
 import { MessageSquareWarning, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { CaseRecord } from "@/types/mockdata/cases";
 
-type QueueFilter = "Assigned" | "Active" | "Resolved" | "All";
-
 type CaseListProps = {
   cases: CaseRecord[];
   selectedCaseId: string;
   onSelectCase: (caseId: string) => void;
-  queueFilter: QueueFilter;
-  onQueueFilterChange: (filter: QueueFilter) => void;
-  quickFilters: {
-    highSeverity: boolean;
-    needsVote: boolean;
-  };
-  onToggleQuickFilter: (filter: "highSeverity" | "needsVote") => void;
 };
-
-const queueTabs: QueueFilter[] = ["Assigned", "Active", "Resolved", "All"];
 
 const severityTone = {
   High: "bg-[color:color-mix(in_srgb,var(--error)_20%,transparent)] text-[var(--error)]",
@@ -47,60 +36,9 @@ export default function CaseList({
   cases,
   selectedCaseId,
   onSelectCase,
-  queueFilter,
-  onQueueFilterChange,
-  quickFilters,
-  onToggleQuickFilter,
 }: CaseListProps) {
   return (
     <section className="flex flex-col gap-4" data-case-list-root="true">
-      <div className="flex flex-col gap-4 border-b border-[color:color-mix(in_srgb,var(--outline-variant)_25%,transparent)] pb-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-6">
-          {queueTabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => onQueueFilterChange(tab)}
-              className={[
-                "relative text-sm font-bold uppercase transition-colors",
-                tab === queueFilter
-                  ? "text-[var(--primary)]"
-                  : "text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]",
-              ].join(" ")}
-            >
-              {tab}
-              {tab === queueFilter && (
-                <span className="absolute -bottom-[17px] left-0 right-0 h-0.5 bg-[var(--primary)]" />
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => onToggleQuickFilter("highSeverity")}
-            className={[
-              "rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-tight transition-colors",
-              quickFilters.highSeverity
-                ? "bg-[color:color-mix(in_srgb,var(--error)_24%,transparent)] text-[var(--error)]"
-                : "bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]",
-            ].join(" ")}
-          >
-            High Severity
-          </button>
-          <button
-            onClick={() => onToggleQuickFilter("needsVote")}
-            className={[
-              "rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-tight transition-colors",
-              quickFilters.needsVote
-                ? "bg-[color:color-mix(in_srgb,var(--secondary)_22%,transparent)] text-[var(--secondary)]"
-                : "bg-[var(--surface-container-high)] text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]",
-            ].join(" ")}
-          >
-            Needs Vote
-          </button>
-        </div>
-      </div>
-
       <div className="flex flex-col gap-3">
         {cases.map((caseItem) => {
           const style = iconTone[caseItem.severity];
@@ -149,6 +87,11 @@ export default function CaseList({
                   {caseItem.assignedToMe && (
                     <span className="rounded-full bg-[color:color-mix(in_srgb,var(--primary)_18%,transparent)] px-2 py-0.5 text-[10px] font-black uppercase text-[var(--primary)]">
                       Assigned to you
+                    </span>
+                  )}
+                  {!caseItem.assignedToMe && caseItem.wasAssignedToMe && (
+                    <span className="rounded-full bg-[var(--surface-container-highest)] px-2 py-0.5 text-[10px] font-black uppercase text-[var(--on-surface-variant)]">
+                      In your history
                     </span>
                   )}
                 </div>

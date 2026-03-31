@@ -2,7 +2,6 @@ import CaseActions from "@/components/cases/detail/CaseActions";
 import CaseDetailHeader from "@/components/cases/detail/CaseDetailHeader";
 import CaseFlaggedMessageCard from "@/components/cases/detail/CaseFlaggedMessageCard";
 import CaseInsightSection from "@/components/cases/detail/CaseInsightSection";
-import CaseNotesList from "@/components/cases/detail/CaseNotesList";
 import CaseProofCard from "@/components/cases/detail/CaseProofCard";
 import CaseVoteProgress from "@/components/cases/detail/CaseVoteProgress";
 import type { CaseRecord } from "@/types/mockdata/cases";
@@ -30,7 +29,6 @@ export default function CaseDetailPanel({
         <CaseInsightSection caseItem={caseItem} />
         <CaseVoteProgress caseItem={caseItem} />
         <CaseProofCard caseItem={caseItem} />
-        <CaseNotesList notes={caseItem.notes} />
       </div>
 
       <CaseActions

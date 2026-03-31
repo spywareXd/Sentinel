@@ -1,29 +1,15 @@
 "use client";
 
-import {
-  FileText,
-  LayoutPanelTop,
-  Search,
-  ShieldAlert,
-  Users,
-} from "lucide-react";
+import { FileText, LayoutPanelTop, ShieldAlert, Users } from "lucide-react";
 
 type CasesHeaderProps = {
-  searchQuery: string;
-  onSearchChange: (value: string) => void;
-  activeTopTab: "Active" | "Pending" | "Resolved";
-  onTopTabChange: (tab: "Active" | "Pending" | "Resolved") => void;
+  activeTopTab: "Assigned" | "History";
+  onTopTabChange: (tab: "Assigned" | "History") => void;
 };
 
-const topTabs: Array<"Active" | "Pending" | "Resolved"> = [
-  "Active",
-  "Pending",
-  "Resolved",
-];
+const topTabs: Array<"Assigned" | "History"> = ["Assigned", "History"];
 
 export default function CasesHeader({
-  searchQuery,
-  onSearchChange,
   activeTopTab,
   onTopTabChange,
 }: CasesHeaderProps) {
@@ -60,17 +46,6 @@ export default function CasesHeader({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--on-surface-variant)]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search case id, title, offender..."
-            className="w-56 rounded-full bg-[var(--surface-container-lowest)] py-2 pl-10 pr-4 text-xs text-[var(--on-surface)] outline-none transition-all focus:w-72 placeholder:text-[color:color-mix(in_srgb,var(--on-surface-variant)_55%,transparent)]"
-          />
-        </div>
-
         <div className="flex items-center gap-1">
           <button
             onClick={() => scrollToRightRailSection("cases-about")}
