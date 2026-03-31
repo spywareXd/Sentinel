@@ -7,20 +7,35 @@ import { createClient } from '@/utils/supabase/server'
 export async function login(formData: FormData) {
   const supabase = await createClient()
 
-  // Typecast here for simplicity
-  const data = {
-    email: formData.get('email') as string,
-    password: formData.get('password') as string,
+  const identifier = formData.get('identifier') as string
+  const password = formData.get('password') as string
+
+  // Determine if the identifier is an email or a username
+  let email = identifier
+
+  if (!identifier.includes('@')) {
+    // It's a username — look up the associated email from profiles
+    const { data: profile, error: lookupError } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('username', identifier)
+      .single()
+
+    if (lookupError || !profile?.email) {
+      return { error: 'No account found with that username.' }
+    }
+
+    email = profile.email
   }
 
-  const { error } = await supabase.auth.signInWithPassword(data)
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return { error: error.message }
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard') // Or wherever you want them to land
+  redirect('/chat')
 }
 
 export async function signup(formData: FormData) {

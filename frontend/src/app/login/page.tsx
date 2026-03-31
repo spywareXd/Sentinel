@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Network, QrCode, UserRound, Wallet } from 'lucide-react';
+import { Shield, QrCode, UserRound, Wallet } from 'lucide-react';
 import { login } from '@/app/actions/auth';
 
 export default function Login() {
@@ -33,9 +33,9 @@ export default function Login() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="bg-[#a3a5fa] text-[#0a0c14] p-3 rounded-[1.2rem] mb-4 shadow-[0_0_30px_rgba(163,165,250,0.2)]">
-            <Network className="w-8 h-8" strokeWidth={2.5} />
+            <Shield className="w-8 h-8" strokeWidth={2.5} />
           </div>
-          <h1 className="text-xl font-bold tracking-[0.25em] text-on-surface uppercase font-headline">Nexus</h1>
+          <h1 className="text-xl font-bold tracking-[0.25em] text-on-surface uppercase font-headline">Sentinel</h1>
         </div>
 
         {/* Main Card */}
@@ -58,15 +58,15 @@ export default function Login() {
           )}
 
           <form className="space-y-5" action={handleSubmit}>
-            {/* Email Field */}
+            {/* Email or Username Field */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-widest text-[var(--on-surface-variant)] uppercase ml-1 block">Email</label>
+              <label className="text-[11px] font-bold tracking-widest text-[var(--on-surface-variant)] uppercase ml-1 block">Email or Username</label>
               <input 
-                type="email" 
-                name="email"
-                placeholder="name@example.com"
+                type="text" 
+                name="identifier"
+                placeholder="name@example.com or username"
                 required
-                className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-on-surface rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-[15px]"
+                className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-white rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-[15px]"
               />
             </div>
 
@@ -83,7 +83,7 @@ export default function Login() {
                 name="password"
                 placeholder="••••••••"
                 required
-                className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-on-surface rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-sm tracking-widest"
+                className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-white rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-sm tracking-widest"
               />
             </div>
 
@@ -112,7 +112,7 @@ export default function Login() {
           </div>
           
           <div className="text-[14px] text-center border-t border-outline-variant/20 pt-6">
-            <span className="text-on-surface-variant">New to Nexus?</span>{' '}
+            <span className="text-on-surface-variant">New to Sentinel?</span>{' '}
             <Link href="/register" className="text-primary font-bold hover:underline">
               Create account
             </Link>

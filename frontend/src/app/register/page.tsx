@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Network, Wallet, Fingerprint, HelpCircle, Landmark, CheckCircle2 } from 'lucide-react';
+import { Shield, Wallet, Fingerprint, HelpCircle, Landmark, CheckCircle2 } from 'lucide-react';
 import { signup } from '@/app/actions/auth';
 
 export default function Register() {
@@ -60,9 +60,9 @@ export default function Register() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="bg-[#a3a5fa] text-[#0a0c14] p-3 rounded-[1.2rem] mb-4 shadow-[0_0_30px_rgba(163,165,250,0.2)]">
-            <Network className="w-8 h-8" strokeWidth={2.5} />
+            <Shield className="w-8 h-8" strokeWidth={2.5} />
           </div>
-          <h1 className="text-xl font-bold tracking-[0.25em] text-on-surface uppercase font-headline">Nexus</h1>
+          <h1 className="text-xl font-bold tracking-[0.25em] text-on-surface uppercase font-headline">Sentinel</h1>
         </div>
 
         {/* Main Card */}
@@ -132,7 +132,7 @@ export default function Register() {
                   name="email"
                   placeholder="name@example.com" 
                   required
-                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-on-surface rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-[15px]"
+                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-white rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-[15px]"
                 />
               </div>
 
@@ -144,7 +144,7 @@ export default function Register() {
                   name="username"
                   placeholder="Choose your alias" 
                   required
-                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-on-surface rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-[15px]"
+                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-white rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-[15px]"
                 />
               </div>
 
@@ -156,7 +156,7 @@ export default function Register() {
                   name="password"
                   placeholder="••••••••" 
                   required
-                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-on-surface rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-sm tracking-widest"
+                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-white rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-sm tracking-widest"
                 />
               </div>
 
@@ -177,7 +177,7 @@ export default function Register() {
 
           {/* Terms text */}
           <div className="mt-6 text-[11px] text-center text-on-surface-variant/60 px-2 leading-relaxed">
-            By connecting and registering, you agree to Nexus's <a href="#" className="font-semibold text-primary/80 hover:text-primary transition-colors">Terms of Service</a> and <a href="#" className="font-semibold text-primary/80 hover:text-primary transition-colors">Privacy Policy</a>.
+            By connecting and registering, you agree to Sentinel's <a href="#" className="font-semibold text-primary/80 hover:text-primary transition-colors">Terms of Service</a> and <a href="#" className="font-semibold text-primary/80 hover:text-primary transition-colors">Privacy Policy</a>.
           </div>
 
           <div className="mt-8 pt-6 border-t border-outline-variant/20 text-center text-sm">
