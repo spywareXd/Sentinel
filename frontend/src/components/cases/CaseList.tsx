@@ -53,7 +53,7 @@ export default function CaseList({
   onToggleQuickFilter,
 }: CaseListProps) {
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-4" data-case-list-root="true">
       <div className="flex flex-col gap-4 border-b border-[color:color-mix(in_srgb,var(--outline-variant)_25%,transparent)] pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-6">
           {queueTabs.map((tab) => (
