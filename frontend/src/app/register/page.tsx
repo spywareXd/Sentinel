@@ -132,7 +132,7 @@ export default function Register() {
                   name="email"
                   placeholder="name@example.com" 
                   required
-                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-white rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-[15px]"
+                  className="w-full bg-white border border-outline-variant/20 text-[#05070a] rounded-xl px-4 py-3.5 placeholder:text-[#05070a]/40 focus:outline-none focus:border-[#a3a5fa] focus:ring-1 focus:ring-[#a3a5fa] transition-all text-[15px]"
                 />
               </div>
 
@@ -144,7 +144,7 @@ export default function Register() {
                   name="username"
                   placeholder="Choose your alias" 
                   required
-                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-white rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-[15px]"
+                  className="w-full bg-white border border-outline-variant/20 text-[#05070a] rounded-xl px-4 py-3.5 placeholder:text-[#05070a]/40 focus:outline-none focus:border-[#a3a5fa] focus:ring-1 focus:ring-[#a3a5fa] transition-all text-[15px]"
                 />
               </div>
 
@@ -156,7 +156,7 @@ export default function Register() {
                   name="password"
                   placeholder="••••••••" 
                   required
-                  className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-white rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-sm tracking-widest"
+                  className="w-full bg-white border border-outline-variant/20 text-[#05070a] rounded-xl px-4 py-3.5 placeholder:text-[#05070a]/40 focus:outline-none focus:border-[#a3a5fa] focus:ring-1 focus:ring-[#a3a5fa] transition-all text-sm tracking-widest"
                 />
               </div>
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Network, Lock } from 'lucide-react';
+import { Shield, Lock } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 export default function UpdatePassword() {
@@ -48,7 +48,7 @@ export default function UpdatePassword() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="bg-[#a3a5fa] text-[#0a0c14] p-3 rounded-[1.2rem] mb-4 shadow-[0_0_30px_rgba(163,165,250,0.2)]">
-            <Network className="w-8 h-8" strokeWidth={2.5} />
+            <Shield className="w-8 h-8" strokeWidth={2.5} />
           </div>
         </div>
 
@@ -77,7 +77,7 @@ export default function UpdatePassword() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="••••••••"
-                className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-on-surface rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-sm tracking-widest"
+                className="w-full bg-white border border-outline-variant/20 text-[#05070a] rounded-xl px-4 py-3.5 placeholder:text-[#05070a]/40 focus:outline-none focus:border-[#a3a5fa] focus:ring-1 focus:ring-[#a3a5fa] transition-all text-sm tracking-widest"
               />
             </div>
 
@@ -89,7 +89,7 @@ export default function UpdatePassword() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 placeholder="••••••••"
-                className="w-full bg-surface-container-lowest/80 border border-outline-variant/20 text-on-surface rounded-xl px-4 py-3.5 placeholder:text-on-surface-variant/40 focus:outline-none focus:border-[#a3a5fa]/50 focus:ring-1 focus:ring-[#a3a5fa]/50 transition-all text-sm tracking-widest"
+                className="w-full bg-white border border-outline-variant/20 text-[#05070a] rounded-xl px-4 py-3.5 placeholder:text-[#05070a]/40 focus:outline-none focus:border-[#a3a5fa] focus:ring-1 focus:ring-[#a3a5fa] transition-all text-sm tracking-widest"
               />
             </div>
 
