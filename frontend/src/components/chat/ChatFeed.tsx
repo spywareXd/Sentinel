@@ -7,7 +7,7 @@ import type { Message } from "@/types/mockdata/chat";
 
 type ChatFeedProps = {
   messages: Message[];
-  onDelete: (messageId: number) => void;
+  onDelete: (messageId: string) => void;
   searchQuery: string;
 };
 
@@ -17,7 +17,7 @@ export default function ChatFeed({
   searchQuery,
 }: ChatFeedProps) {
   const feedRef = useRef<HTMLElement | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     const feed = feedRef.current;

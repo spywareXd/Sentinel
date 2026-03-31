@@ -15,7 +15,7 @@ type MessageRowProps = {
   isMenuOpen: boolean;
   onToggleMenu: () => void;
   onCopy: (text: string) => void;
-  onDelete: (messageId: number) => void;
+  onDelete: (messageId: string) => void;
   onCloseMenu: () => void;
 };
 

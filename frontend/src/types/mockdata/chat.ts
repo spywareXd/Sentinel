@@ -1,7 +1,7 @@
 export type MessageTone = "primary" | "secondary" | "tertiary" | "self";
 
 export type Message = {
-  id: number;
+  id: string; // UUID from supabase
   author: string;
   authorInitials: string;
   authorLogoUrl?: string | null;
