@@ -8,11 +8,6 @@ export type RoomMember = {
   status: MemberStatus;
 };
 
-export type PreviousCasesItems = {
-  title: string;
-  subtitle: string;
-};
-
 export type RoomDetails = {
   heading: string;
   description: string;
