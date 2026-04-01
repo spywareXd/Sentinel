@@ -21,12 +21,12 @@ async def scan_unprocessed():
         if not messages:
             return
         
-        print(f"\n📨 Found {len(messages)} unprocessed messages")
+        print(f"\nFound {len(messages)} unprocessed messages")
         
         from services.scanner import scan
         
         for msg in messages:
-            print(f"🆕 Scanning: {msg['content'][:40]}...")
+            print(f"Scanning: {msg['content'][:40]}...")
             
             # Get user's warning count for punishment calibration
             warning_count = 0
@@ -54,12 +54,12 @@ async def scan_unprocessed():
                 "processed_at": datetime.now(IST).isoformat()
             }).eq("id", msg["id"]).execute()
             
-            status = "🚨 FLAGGED" if result["flagged"] else "✅ SAFE"
+            status = "FLAGGED" if result["flagged"] else "SAFE"
             print(f"   {status} | Score: {result['harmful_score']:.2f} | Punishment: {result.get('punishment', 'none')}")
             
             # ===== NEW: Create moderation case if flagged =====
             if result["flagged"] and msg.get("user_id"):
-                print(f"⚖️ Triggering moderation case...")
+                print("Triggering moderation case...")
                 
                 # Check if case already exists for this message
                 existing = supabase.table("moderation_cases") \
@@ -78,14 +78,14 @@ async def scan_unprocessed():
                     )
                     
                     if case_result["success"]:
-                        print(f"   ✅ Moderation case created! Chain ID: {case_result['blockchain_case_id']}")
+                        print(f"   Moderation case created. Chain ID: {case_result['blockchain_case_id']}")
                     else:
-                        print(f"   ⚠️ Moderation case issue: {case_result.get('reason', 'unknown')}")
+                        print(f"   Warning: Moderation case issue: {case_result.get('reason', 'unknown')}")
                 else:
-                    print(f"   ℹ️ Case already exists for this message")
+                    print("   Case already exists for this message")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
         import traceback
         traceback.print_exc()
 
@@ -96,13 +96,13 @@ async def check_resolved():
         from services.moderation import check_and_update_resolved_cases
         check_and_update_resolved_cases()
     except Exception as e:
-        print(f"❌ Error checking resolved: {e}")
+        print(f"Error checking resolved: {e}")
 
 
 async def main():
-    print("🔄 Sentinel scanner started...")
-    print("   📡 Scanning for new messages every 2 seconds")
-    print("   ⚖️ Checking resolved cases every 10 seconds")
+    print("Sentinel scanner started.")
+    print("Scanning for new messages every 2 seconds")
+    print("Checking resolved cases every 10 seconds")
     
     cycle = 0
     while True:

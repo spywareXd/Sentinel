@@ -220,3 +220,19 @@ __marimo__/
   
 # Streamlit  
 .streamlit/secrets.toml
+
+#.venv
+.venv
+
+frontend/AGENTS.md
+frontend/CLAUDE.md
+stitch/
+stitch (1)/
+
+#mac specific
+.DS_Store
+
+#old repo
+context/
+
+.sfdx

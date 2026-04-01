@@ -30,21 +30,21 @@ def select_random_moderators(exclude_user_id: str = None, count: int = 3) -> lis
         eligible = [p for p in eligible if p.get("wallet_address") and p["wallet_address"].strip()]
         
         if len(eligible) < count:
-            print(f"⚠️ Only {len(eligible)} eligible moderators found (need {count})")
+            print(f"Warning: Only {len(eligible)} eligible moderators found (need {count})")
             if len(eligible) == 0:
                 return []
             count = len(eligible)
         
         selected = random.sample(eligible, count)
         
-        print(f"👥 Selected {len(selected)} moderators:")
+        print(f"Selected {len(selected)} moderators:")
         for mod in selected:
             print(f"   - {mod['username']} ({mod['wallet_address'][:10]}...)")
         
         return selected
         
     except Exception as e:
-        print(f"❌ Error selecting moderators: {e}")
+        print(f"Error selecting moderators: {e}")
         return []
 
 
@@ -57,7 +57,7 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
     4. Update moderation_cases with blockchain_case_id
     """
     try:
-        print(f"\n🚨 Creating moderation case for message: {message_id}")
+        print(f"\nCreating moderation case for message: {message_id}")
         
         # --- Step 1: Get offender wallet address ---
         offender_resp = supabase.table("profiles") \
@@ -81,14 +81,14 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
                 offender_wallet = msg_resp.data["wallet_address"]
         
         if not offender_wallet:
-            print("⚠️ No wallet address found for offender, using zero address")
+            print("Warning: No wallet address found for offender, using zero address")
             offender_wallet = "0x0000000000000000000000000000000000000000"
         
         # --- Step 2: Select 3 random moderators ---
         moderators = select_random_moderators(exclude_user_id=user_id, count=3)
         
         if len(moderators) < 3:
-            print(f"❌ Not enough moderators ({len(moderators)}/3). Skipping blockchain call.")
+            print(f"Error: Not enough moderators ({len(moderators)}/3). Skipping blockchain call.")
             # Still create the case in Supabase for tracking
             mod_wallets = [m["wallet_address"].lower() for m in moderators]
             while len(mod_wallets) < 3:
@@ -115,9 +115,9 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
             f"{message_id}:{content}".encode()
         ).hexdigest()
         
-        print(f"📝 Message hash: {message_hash[:20]}...")
-        print(f"👤 Offender wallet: {offender_wallet}")
-        print(f"👥 Moderator wallets: {[w[:10]+'...' for w in mod_wallets]}")
+        print(f"Message hash: {message_hash[:20]}...")
+        print(f"Offender wallet: {offender_wallet}")
+        print(f"Moderator wallets: {[w[:10]+'...' for w in mod_wallets]}")
         
         # --- Step 4: Insert case into Supabase FIRST ---
         case_data = {
@@ -134,11 +134,11 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
         insert_resp = supabase.table("moderation_cases").insert(case_data).execute()
         
         if not insert_resp.data:
-            print("❌ Failed to insert case into Supabase")
+            print("Error: Failed to insert case into Supabase")
             return {"success": False, "reason": "db_insert_failed"}
         
         supabase_case_id = insert_resp.data[0]["id"]
-        print(f"📦 Supabase case created: {supabase_case_id}")
+        print(f"Supabase case created: {supabase_case_id}")
         
         # --- Step 5: Call smart contract ---
         chain_result = create_case_on_chain(
@@ -156,7 +156,7 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
                 "status": "voting"
             }).eq("id", supabase_case_id).execute()
             
-            print(f"✅ Moderation case fully created!")
+            print("Moderation case fully created.")
             print(f"   Supabase ID: {supabase_case_id}")
             print(f"   Blockchain Case ID: {blockchain_case_id}")
             print(f"   TX: {chain_result['tx_hash']}")
@@ -174,7 +174,7 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
                 "status": "chain_error"
             }).eq("id", supabase_case_id).execute()
             
-            print(f"⚠️ Case created in DB but blockchain call failed: {chain_result.get('error')}")
+            print(f"Warning: Case created in DB but blockchain call failed: {chain_result.get('error')}")
             return {
                 "success": False,
                 "reason": "blockchain_failed",
@@ -183,7 +183,7 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
             }
         
     except Exception as e:
-        print(f"❌ Error creating moderation case: {e}")
+        print(f"Error creating moderation case: {e}")
         import traceback
         traceback.print_exc()
         return {"success": False, "reason": str(e)}
@@ -220,7 +220,7 @@ def check_and_update_resolved_cases():
                     "decision": decision
                 }).eq("id", case["id"]).execute()
                 
-                print(f"⚖️ Case {case['blockchain_case_id']} resolved: {decision.upper()}")
+                print(f"Case {case['blockchain_case_id']} resolved: {decision.upper()}")
                 
                 # If punished, increment warnings on the offender's profile
                 if decision == "punish":
@@ -246,7 +246,7 @@ def check_and_update_resolved_cases():
                             "warnings": current_warnings + 1
                         }).eq("id", offender_id).execute()
                         
-                        print(f"⚠️ Offender {offender_id} warnings: {current_warnings} → {current_warnings + 1}")
+                        print(f"Warning count for offender {offender_id}: {current_warnings} -> {current_warnings + 1}")
                 
     except Exception as e:
-        print(f"❌ Error checking resolved cases: {e}")
+        print(f"Error checking resolved cases: {e}")
