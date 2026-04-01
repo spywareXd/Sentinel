@@ -13,6 +13,16 @@ import type { Message } from "@/types/mockdata/chat";
 import type { RoomMember } from "@/types/mockdata/room";
 import { createClient } from "@/utils/supabase/client";
 
+const getFrontendPunishmentExpiry = (punishment: UserPunishment) => {
+  if (punishment.duration_hours && punishment.issued_at) {
+    return new Date(
+      new Date(punishment.issued_at).getTime() + punishment.duration_hours * 60 * 1000,
+    );
+  }
+
+  return punishment.expires_at ? new Date(punishment.expires_at) : null;
+};
+
 type ProfileSummary = {
   id: string;
   username: string | null;
@@ -41,11 +51,12 @@ export default function Home() {
 
   const formatPunishmentLabel = (punishment: UserPunishment) => {
     const type = punishment.punishment_type.replace(/[_-]+/g, " ");
-    if (!punishment.expires_at) {
+    const expiresAt = getFrontendPunishmentExpiry(punishment);
+
+    if (!expiresAt) {
       return `${type} active`;
     }
 
-    const expiresAt = new Date(punishment.expires_at);
     return `${type} until ${expiresAt.toLocaleString([], {
       month: "short",
       day: "numeric",
@@ -103,9 +114,8 @@ export default function Home() {
 
       if (punishment) {
         const typedPunishment = punishment as UserPunishment;
-        const isStillActive =
-          !typedPunishment.expires_at ||
-          new Date(typedPunishment.expires_at).getTime() > Date.now();
+        const expiresAt = getFrontendPunishmentExpiry(typedPunishment);
+        const isStillActive = !expiresAt || expiresAt.getTime() > Date.now();
 
         setActivePunishment(isStillActive ? typedPunishment : null);
       } else {

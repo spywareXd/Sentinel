@@ -14,6 +14,20 @@ import { useEffect, useMemo, useState } from "react";
 import ProfileLogo from "@/components/ui/ProfileLogo";
 import { createClient } from "@/utils/supabase/client";
 
+const getFrontendPunishmentExpiry = (punishment: {
+  duration_hours: number | null;
+  issued_at: string | null;
+  expires_at: string | null;
+}) => {
+  if (punishment.duration_hours && punishment.issued_at) {
+    return new Date(
+      new Date(punishment.issued_at).getTime() + punishment.duration_hours * 60 * 1000,
+    );
+  }
+
+  return punishment.expires_at ? new Date(punishment.expires_at) : null;
+};
+
 const sidebarBrand = {
   name: "SentinelDAO",
   tagline: "Community Layer",
@@ -64,7 +78,7 @@ export default function Sidebar() {
 
         const { data: punishment } = await supabase
           .from("user_punishments")
-          .select("punishment_type, expires_at, is_active")
+          .select("punishment_type, duration_hours, issued_at, expires_at, is_active")
           .eq("user_id", session.user.id)
           .eq("is_active", true)
           .order("issued_at", { ascending: false })
@@ -72,7 +86,7 @@ export default function Sidebar() {
           .maybeSingle();
 
         if (punishment?.is_active) {
-          const expiresAt = punishment.expires_at ? new Date(punishment.expires_at) : null;
+          const expiresAt = getFrontendPunishmentExpiry(punishment);
           const stillActive = !expiresAt || expiresAt.getTime() > Date.now();
 
           if (stillActive) {
