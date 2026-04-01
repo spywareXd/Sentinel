@@ -1,6 +1,10 @@
-# backend/scanner_loop.py
-
+import sys
+import os
 import asyncio
+
+# Ensure backend directory is in sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from core.database import supabase
 from datetime import datetime, timezone, timedelta
 

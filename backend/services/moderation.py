@@ -4,7 +4,7 @@ import hashlib
 import random
 from datetime import datetime, timezone, timedelta
 from core.database import supabase
-from services.web3_client import create_case_on_chain
+from services.blockchain import create_case_on_chain
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -207,7 +207,7 @@ def check_and_update_resolved_cases():
         if not pending_cases:
             return
         
-        from services.web3_client import get_case_from_chain
+        from services.blockchain import get_case_from_chain
         
         for case in pending_cases:
             chain_data = get_case_from_chain(case["blockchain_case_id"])
