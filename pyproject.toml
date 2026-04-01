@@ -17,3 +17,4 @@ dependencies = [
     "uvicorn>=0.42.0",
     "web3>=7.14.1",
 ]
+
