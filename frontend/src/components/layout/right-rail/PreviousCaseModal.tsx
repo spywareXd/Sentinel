@@ -52,7 +52,7 @@ export default function PreviousCaseModal({
               {caseItem.title}
             </h3>
             <p className="mt-2 text-sm text-[var(--on-surface-variant)]">
-              {caseItem.subtitle}
+              {caseItem.aiReason}
             </p>
           </div>
 
@@ -124,7 +124,7 @@ export default function PreviousCaseModal({
                 Target User
               </p>
               <p className="mt-3 text-sm font-semibold text-[var(--on-surface)]">
-                {caseItem.targetUser}
+                {caseItem.offender}
               </p>
             </div>
           </div>
@@ -161,14 +161,9 @@ export default function PreviousCaseModal({
               Notes
             </p>
             <div className="mt-3 space-y-2">
-              {caseItem.notes.map((note) => (
-                <div
-                  key={note}
-                  className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-sm text-[var(--on-surface)]"
-                >
-                  {note}
-                </div>
-              ))}
+              <div className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-sm text-[var(--on-surface-variant)]">
+                No additional notes for this case.
+              </div>
             </div>
           </div>
         </div>

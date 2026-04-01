@@ -99,6 +99,10 @@ const mapCaseRecord = (dbCase: any): CaseRecord => {
       dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
         ? `CHAIN-${dbCase.blockchain_case_id}`
         : "Pending chain sync",
+    blockchainCaseId:
+      dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
+        ? Number(dbCase.blockchain_case_id)
+        : null,
   };
 };
 
@@ -111,6 +115,7 @@ export default function CasesPage() {
   const [isDetailDismissed, setIsDetailDismissed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [moderatorWallet, setModeratorWallet] = useState("");
   const detailPanelRef = useRef<HTMLDivElement | null>(null);
 
   const filteredCases = useMemo(() => {
@@ -166,6 +171,7 @@ export default function CasesPage() {
         .single();
 
       const walletAddress = profile?.wallet_address?.toLowerCase();
+      setModeratorWallet(walletAddress ?? "");
 
       if (!walletAddress) {
         setCases([]);
@@ -205,7 +211,7 @@ export default function CasesPage() {
     void loadCases();
   }, [refreshKey, router, supabase]);
 
-  const resolveCase = (caseId: string, decision: Exclude<CaseDecision, null>) => {
+  const resolveCase = (caseId: string, decision: "Punished" | "Dismissed") => {
     setCases((currentCases) =>
       currentCases.map((caseItem) => {
         if (caseItem.id !== caseId || caseItem.status === "Resolved") {
@@ -216,7 +222,7 @@ export default function CasesPage() {
 
         return {
           ...caseItem,
-          status: "Resolved",
+          status: "Resolved" as const,
           decision,
           resolvedAt: "Resolved just now",
           assignedToMe: false,
@@ -334,8 +340,8 @@ export default function CasesPage() {
               <div ref={detailPanelRef}>
                 <CaseDetailPanel
                   caseItem={selectedCase}
-                  onDismiss={() => resolveCase(selectedCase.id, "Dismissed")}
-                  onPunish={() => resolveCase(selectedCase.id, "Punished")}
+                  moderatorAddress={moderatorWallet}
+                  onVoteSuccess={(decision) => resolveCase(selectedCase.id, decision)}
                 />
               </div>
             ) : (

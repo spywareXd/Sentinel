@@ -1,10 +1,82 @@
 # backend/routes/moderation.py
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 from core.database import supabase
-from services.blockchain import get_case_from_chain, get_case_count
+from services.blockchain import get_case_from_chain, get_case_count, verify_vote_on_chain
 
 router = APIRouter(prefix="/moderation", tags=["Moderation"])
+
+
+class VoteSyncRequest(BaseModel):
+    case_id: str          # UUID of the moderation case in Supabase
+    moderator_address: str  # wallet address of the moderator who voted
+    vote: int              # 1 = punish, 2 = dismiss
+    tx_hash: str           # transaction hash from MetaMask
+
+
+@router.post("/vote/sync")
+def sync_vote(body: VoteSyncRequest):
+    """
+    Called by frontend AFTER a moderator submits their vote via MetaMask.
+    Verifies the vote on-chain, then updates the moderation case in Supabase.
+    If 2+ votes agree (majority), marks the case resolved.
+    """
+    # Fetch the case
+    resp = supabase.table("moderation_cases") \
+        .select("*") \
+        .eq("id", body.case_id) \
+        .single() \
+        .execute()
+
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    case = resp.data
+
+    if case.get("status") == "resolved":
+        raise HTTPException(status_code=400, detail="Case already resolved")
+
+    blockchain_case_id = case.get("blockchain_case_id")
+    if blockchain_case_id is None:
+        raise HTTPException(status_code=400, detail="Case has no blockchain ID yet")
+
+    # Verify on-chain
+    on_chain = verify_vote_on_chain(blockchain_case_id, body.moderator_address)
+    if not on_chain.get("has_voted"):
+        raise HTTPException(
+            status_code=422,
+            detail="On-chain verification failed: vote not found on blockchain"
+        )
+
+    # Check current on-chain case state
+    chain_case = get_case_from_chain(blockchain_case_id)
+
+    if chain_case and chain_case.get("resolved"):
+        # Contract resolved the case — determine outcome
+        decision_code = chain_case.get("decision", 0)
+        decision = "punish" if decision_code == 1 else "dismiss"
+        supabase.table("moderation_cases").update({
+            "status": "resolved",
+            "decision": decision
+        }).eq("id", body.case_id).execute()
+        return {
+            "success": True,
+            "vote_recorded": True,
+            "case_resolved": True,
+            "decision": decision,
+            "tx_hash": body.tx_hash,
+            "on_chain": chain_case
+        }
+
+    return {
+        "success": True,
+        "vote_recorded": True,
+        "case_resolved": False,
+        "vote": body.vote,
+        "tx_hash": body.tx_hash,
+        "on_chain": chain_case
+    }
 
 
 @router.get("/cases")

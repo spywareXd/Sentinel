@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables once here
-load_dotenv()
+# Load the shared root .env — works regardless of CWD
+_root_env = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(dotenv_path=_root_env, override=True)
 
 # Database Config
 SUPABASE_URL = os.getenv("SUPABASE_URL")

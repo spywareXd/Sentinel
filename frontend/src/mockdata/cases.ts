@@ -25,6 +25,7 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Case is still active. Current consensus leans strongly toward punishment, but quorum has not been fully reached yet.",
     chainRef: "0X82...F2E1",
+    blockchainCaseId: null,
   },
   {
     id: "case-9281",
@@ -50,6 +51,7 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Still in voting. Current sentiment suggests dismissal unless new context shows targeted harassment.",
     chainRef: "0X42...A911",
+    blockchainCaseId: null,
   },
   {
     id: "case-9270",
@@ -76,6 +78,7 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Case resolved with punishment after jurors reviewed the original message and follow-up replies. The decision remains visible for transparency review.",
     chainRef: "0X91...DD42",
+    blockchainCaseId: null,
   },
   {
     id: "case-9264",
@@ -101,6 +104,7 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Case has just entered jury review. This one requires immediate attention because the language is unambiguous.",
     chainRef: "0X77...C108",
+    blockchainCaseId: null,
   },
   {
     id: "case-9258",
@@ -127,5 +131,6 @@ export const caseRecords: CaseRecord[] = [
     outcome:
       "Resolved with dismissal and no account penalty. Message stayed visible but moderators noted the pattern for future spam escalation.",
     chainRef: "0X11...B812",
+    blockchainCaseId: null,
   },
 ];
