@@ -19,6 +19,8 @@
   --secondary-container: #00a6e0;
   --tertiary: #ffb783;
   --tertiary-container: #d97721;
+  --error: #dc2626;
+  --on-error-container: #ffffff;
 
   --on-surface: #dae2fd;
   --on-surface-variant: #c7c4d7;

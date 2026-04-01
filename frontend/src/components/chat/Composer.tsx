@@ -6,16 +6,22 @@ import { feedMeta } from "@/mockdata/chat";
 
 type ComposerProps = {
   onSend: (text: string) => void;
+  disabled?: boolean;
+  disabledReason?: string | null;
 };
 
-export default function Composer({ onSend }: ComposerProps) {
+export default function Composer({
+  onSend,
+  disabled = false,
+  disabledReason = null,
+}: ComposerProps) {
   const [draft, setDraft] = useState("");
   const isDrafting = draft.trim().length > 0;
 
   const submitMessage = () => {
     const trimmedDraft = draft.trim();
 
-    if (!trimmedDraft) return;
+    if (!trimmedDraft || disabled) return;
 
     onSend(trimmedDraft);
     setDraft("");
@@ -32,8 +38,11 @@ export default function Composer({ onSend }: ComposerProps) {
 
             <input
               type="text"
-              placeholder={feedMeta.composerPlaceholder}
+              placeholder={
+                disabled ? "Messaging is temporarily disabled." : feedMeta.composerPlaceholder
+              }
               value={draft}
+              disabled={disabled}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
@@ -41,7 +50,7 @@ export default function Composer({ onSend }: ComposerProps) {
                   submitMessage();
                 }
               }}
-              className="flex-1 bg-transparent text-sm text-[var(--on-surface)] outline-none placeholder:text-[color:color-mix(in_srgb,var(--on-surface-variant)_40%,transparent)]"
+              className="flex-1 bg-transparent text-sm text-[var(--on-surface)] outline-none placeholder:text-[color:color-mix(in_srgb,var(--on-surface-variant)_40%,transparent)] disabled:cursor-not-allowed disabled:text-[color:color-mix(in_srgb,var(--on-surface-variant)_75%,transparent)]"
             />
 
             <div className="flex shrink-0 items-center gap-3">
@@ -53,7 +62,7 @@ export default function Composer({ onSend }: ComposerProps) {
               </button>
               <button
                 onClick={submitMessage}
-                disabled={!draft.trim()}
+                disabled={disabled || !draft.trim()}
                 className="rounded-full bg-gradient-to-tr from-[var(--primary)] to-[var(--primary-container)] p-2.5 text-[#07006c] shadow-[0_0_20px_rgba(192,193,255,0.4)] transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100 disabled:shadow-none"
               >
                 <Send className="h-4 w-4" />
@@ -64,11 +73,11 @@ export default function Composer({ onSend }: ComposerProps) {
 
         <div className="mt-2 flex items-center justify-between px-2">
           <p className="text-[10px] text-[color:color-mix(in_srgb,var(--on-surface-variant)_50%,transparent)]">
-            {feedMeta.helperText}
+            {disabledReason ?? feedMeta.helperText}
           </p>
 
           <div className="flex items-center gap-2">
-            {isDrafting && (
+            {!disabled && isDrafting && (
               <>
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 <p className="text-[10px] text-[color:color-mix(in_srgb,var(--on-surface-variant)_70%,transparent)]">

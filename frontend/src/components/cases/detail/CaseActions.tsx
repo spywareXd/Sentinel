@@ -35,7 +35,7 @@ export default function CaseActions({
       <button
         type="button"
         onClick={onPunish}
-        className="flex-1 rounded-xl bg-gradient-to-br from-[#ff6b6b] to-[var(--error)] py-3 text-sm font-bold text-[var(--on-error-container)] shadow-[0_6px_12px_rgba(147,0,10,0.09)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55flex-1 rounded-xl border border-[#b91c1c] bg-gradient-to-b from-[#ef4444] to-[#dc2626] py-3 text-sm font-bold text-white shadow-[0_3px_8px_rgba(127,29,29,0.16)] transition-[transform,box-shadow,filter] hover:brightness-105 hover:shadow-[0_5px_12px_rgba(127,29,29,0.2)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:shadow-[0_3px_8px_rgba(127,29,29,0.16)]"
+        className="flex-1 rounded-xl border border-[#b91c1c] bg-gradient-to-b from-[#ef4444] to-[#dc2626] py-3 text-sm font-bold text-white shadow-[0_3px_8px_rgba(127,29,29,0.16)] transition-[transform,box-shadow,filter] hover:brightness-105 hover:shadow-[0_5px_12px_rgba(127,29,29,0.2)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:shadow-[0_3px_8px_rgba(127,29,29,0.16)]"
       >
         Vote: Punish
       </button>
