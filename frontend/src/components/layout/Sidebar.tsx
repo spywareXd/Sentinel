@@ -21,7 +21,7 @@ const sidebarBrand = {
 };
 
 const navItems = [
-  { label: "Feed", icon: "home", href: "/" },
+  { label: "Feed", icon: "home", href: "/chat" },
   { label: "Cases", icon: "shield", href: "/cases" },
   { label: "Activity", icon: "gavel", href: "#" },
   { label: "Settings", icon: "settings", href: "#" },

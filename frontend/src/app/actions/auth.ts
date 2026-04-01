@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
 export async function login(formData: FormData) {
   const supabase = await createClient()
 
@@ -48,15 +50,12 @@ export async function signup(formData: FormData) {
     walletAddress: formData.get('walletAddress') as string,
   }
 
-  const origin = process.env.NEXT_PUBLIC_SUPABASE_URL ? 
-    'http://localhost:3000' : 'http://localhost:3000'
-
   // Passing user_metadata is essential so a Supabase trigger can insert them to public.profiles
   const { error } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${appUrl}/auth/callback`,
       data: {
         username: data.username,
         wallet_address: data.walletAddress,
@@ -77,7 +76,7 @@ export async function resetPassword(formData: FormData) {
   const email = formData.get('email') as string
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `http://localhost:3000/auth/callback?next=/auth/update-password`,
+    redirectTo: `${appUrl}/auth/callback?next=/auth/update-password`,
   })
 
   if (error) {
