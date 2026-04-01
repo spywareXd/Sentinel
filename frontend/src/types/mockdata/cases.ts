@@ -1,4 +1,4 @@
-export type CaseSeverity = "High" | "Medium" | "Low";
+export type CaseSeverity = "Extreme" | "High" | "Medium" | "Low";
 
 export type CaseStatus = "Assigned" | "Voting" | "Resolved";
 

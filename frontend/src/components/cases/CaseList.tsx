@@ -8,6 +8,7 @@ type CaseListProps = {
 };
 
 const severityTone = {
+  Extreme: "bg-[color:color-mix(in_srgb,var(--error)_28%,transparent)] text-[var(--error)]",
   High: "bg-[color:color-mix(in_srgb,var(--error)_20%,transparent)] text-[var(--error)]",
   Medium:
     "bg-[color:color-mix(in_srgb,var(--tertiary)_18%,transparent)] text-[var(--tertiary)]",
@@ -15,6 +16,11 @@ const severityTone = {
 } as const;
 
 const iconTone = {
+  Extreme: {
+    Icon: ShieldAlert,
+    iconColor: "text-[var(--error)]",
+    railColor: "border-[color:color-mix(in_srgb,var(--error)_90%,white_10%)]",
+  },
   High: {
     Icon: ShieldAlert,
     iconColor: "text-[var(--error)]",

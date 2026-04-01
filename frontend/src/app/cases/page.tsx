@@ -21,8 +21,10 @@ const toTitleCase = (value: string) =>
     .join(" ");
 
 const getSeverity = (harmfulScore: number, severeScore: number) => {
-  if (severeScore >= 0.75 || harmfulScore >= 0.8) return "High";
-  if (severeScore >= 0.45 || harmfulScore >= 0.5) return "Medium";
+  if (severeScore >= 0.9 || harmfulScore >= 0.9) return "Extreme";
+  if (severeScore >= 0.75 || harmfulScore >= 0.75) return "High";
+  if (severeScore >= 0.4 || harmfulScore >= 0.4) return "Medium";
+  if (severeScore >= 0.1 || harmfulScore >= 0.1) return "Low";
   return "Low";
 };
 
