@@ -6,7 +6,7 @@ import ProfileLogo from "@/components/ui/ProfileLogo";
 
 export default function RightRail() {
   return (
-    <aside className="flex w-72 shrink-0 min-h-0 flex-col overflow-hidden bg-[var(--surface-container)]">
+    <aside className="flex w-72 shrink-0 min-h-0 flex-col overflow-hidden bg-[var(--surface-container-low)]">
       <div id="room-details-top" className="shrink-0 px-6 py-5">
         <h2 className="font-headline text-sm font-bold text-[var(--on-surface)]">
           {roomDetails.heading}
@@ -44,7 +44,7 @@ export default function RightRail() {
                   />
                   <span
                     className={[
-                      "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface-container)]",
+                      "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface-container-low)]",
                       member.status === "online"
                         ? "bg-emerald-400"
                         : "bg-[var(--tertiary-container)]",

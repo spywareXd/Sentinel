@@ -69,14 +69,12 @@ export default function ChatFeed({
       className="premium-scrollbar flex min-w-0 min-h-0 flex-1 flex-col overflow-y-auto px-6 py-6"
     >
       <div className="flex flex-col">
-        <div className="mb-6 flex items-center gap-4 py-4">
-          <div className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--outline-variant)_20%,transparent)]" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[color:color-mix(in_srgb,var(--on-surface-variant)_70%,transparent)]">
+        <div className="mb-6 flex justify-center py-4">
+          <span className="rounded-full bg-[var(--surface-container-highest)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--on-surface-variant)] shadow-sm">
             {searchQuery.trim()
               ? `${messages.length} result${messages.length === 1 ? "" : "s"}`
               : feedMeta.dayLabel}
           </span>
-          <div className="h-px flex-1 bg-[color:color-mix(in_srgb,var(--outline-variant)_20%,transparent)]" />
         </div>
 
         {messages.length === 0 ? (
@@ -84,26 +82,33 @@ export default function ChatFeed({
             No messages matched "{searchQuery.trim()}".
           </div>
         ) : (
-          <div className="space-y-4">
-            {messages.map((message, index) => (
-              <MessageRow
-                key={message.id}
-                message={message}
-                shouldOpenUp={index >= messages.length - 3}
-                isMenuOpen={openMenuId === message.id}
-                onToggleMenu={() =>
-                  setOpenMenuId((currentId) =>
-                    currentId === message.id ? null : message.id,
-                  )
-                }
-                onCopy={(text) => void handleCopy(text)}
-                onDelete={(messageId) => {
-                  onDelete(messageId);
-                  setOpenMenuId(null);
-                }}
-                onCloseMenu={() => setOpenMenuId(null)}
-              />
-            ))}
+          <div className="flex flex-col">
+            {messages.map((message, index) => {
+              const prevMessage = messages[index - 1];
+              const isGrouped = !!prevMessage && prevMessage.author === message.author;
+              const msgWithGrouped = { ...message, grouped: isGrouped };
+              
+              return (
+                <div key={message.id} className={index === 0 ? "" : (isGrouped ? "mt-1" : "mt-4")}>
+                  <MessageRow
+                    message={msgWithGrouped}
+                    shouldOpenUp={index >= messages.length - 3}
+                    isMenuOpen={openMenuId === message.id}
+                    onToggleMenu={() =>
+                      setOpenMenuId((currentId) =>
+                        currentId === message.id ? null : message.id,
+                      )
+                    }
+                    onCopy={(text) => void handleCopy(text)}
+                    onDelete={(messageId) => {
+                      onDelete(messageId);
+                      setOpenMenuId(null);
+                    }}
+                    onCloseMenu={() => setOpenMenuId(null)}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

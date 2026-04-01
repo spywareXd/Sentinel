@@ -10,8 +10,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import ProfileLogo from "@/components/ui/ProfileLogo";
-import { currentUser } from "@/mockdata/user";
+import { createClient } from "@/utils/supabase/client";
 
 const sidebarBrand = {
   name: "SentinelDAO",
@@ -36,9 +37,25 @@ const iconMap = {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const supabase = createClient();
+  const [userName, setUserName] = useState<string>("Loading...");
+  const [userInitials, setUserInitials] = useState<string>("");
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase.from('profiles').select('username').eq('id', session.user.id).single();
+        const name = profile?.username || session.user.email || "Sentinel";
+        setUserName(name);
+        setUserInitials(name.substring(0, 1).toUpperCase());
+      }
+    };
+    fetchUser();
+  }, []);
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col bg-[var(--surface-container)] px-4 py-4 text-[var(--on-surface)]">
+    <aside className="flex h-screen w-64 shrink-0 flex-col bg-[var(--surface-container-low)] px-4 py-4 text-[var(--on-surface)]">
       <div className="mb-8 flex items-center gap-3 px-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-container)] text-[#07006c] shadow-[0_12px_30px_rgba(128,131,255,0.22)]">
           <Shield className="h-5 w-5" />
@@ -82,28 +99,27 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-4 border-t border-[color:color-mix(in_srgb,var(--outline-variant)_20%,transparent)] pt-4">
+      <div className="mt-4 pt-4">
         <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]">
           <HelpCircle className="h-4 w-4" />
           <span className="font-medium">Help</span>
         </button>
 
-        <div className="mt-4 rounded-xl bg-[var(--surface-container-high)] p-3">
+        <div className="mt-4 rounded-xl bg-[var(--surface-container-high)] p-3 hover:bg-[var(--surface-container-highest)] transition-colors cursor-pointer">
           <div className="flex items-center gap-3">
             <ProfileLogo
-              name={currentUser.name}
-              initials={currentUser.initials}
-              logoUrl={currentUser.logoUrl}
+              name={userName}
+              initials={userInitials}
               className="h-10 w-10 rounded-lg object-cover"
               fallbackClassName="flex h-10 w-10 items-center justify-center rounded-lg bg-[color:color-mix(in_srgb,var(--primary)_18%,transparent)] text-sm font-bold text-[var(--primary)]"
             />
 
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--on-surface)]">
-                {currentUser.name}
+                {userName}
               </p>
               <p className="truncate text-xs text-[var(--on-surface-variant)]">
-                {currentUser.status}
+                Available
               </p>
             </div>
           </div>

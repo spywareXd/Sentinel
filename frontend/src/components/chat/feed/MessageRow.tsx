@@ -35,7 +35,7 @@ export default function MessageRow({
       className={[
         "group flex gap-4",
         isSelf ? "flex-row-reverse" : "",
-        message.grouped ? "ml-14" : "",
+        message.grouped ? (isSelf ? "mr-14" : "ml-14") : "",
       ].join(" ")}
     >
       {!message.grouped && (
@@ -80,8 +80,8 @@ export default function MessageRow({
             className={[
               "max-w-2xl rounded-xl p-4 text-sm leading-7 shadow-sm",
               isSelf
-                ? "rounded-tr-sm bg-[color:color-mix(in_srgb,var(--primary)_16%,transparent)] text-[var(--on-surface)]"
-                : "rounded-tl-sm bg-[var(--bubble-bg)] text-[var(--on-surface)]",
+                ? "rounded-tr-sm bg-[var(--surface-container-high)] text-[var(--on-surface)]"
+                : "rounded-tl-sm bg-[var(--surface-container-high)] text-[var(--on-surface)]",
             ].join(" ")}
           >
             {message.text}

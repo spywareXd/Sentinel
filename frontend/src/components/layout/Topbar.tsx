@@ -49,10 +49,10 @@ export default function Topbar({
             <button
               key={tab}
               className={[
-                "pb-1 text-sm font-medium transition-colors",
+                "px-3 py-1.5 text-sm font-bold transition-all rounded-lg",
                 tab === topbarConfig.activeTab
-                  ? "border-b-2 border-[var(--primary)] text-[var(--primary)]"
-                  : "text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]",
+                  ? "bg-[var(--surface-container-highest)] text-[var(--primary)]"
+                  : "text-[var(--on-surface-variant)] hover:bg-[var(--surface-container-high)] hover:text-[var(--on-surface)]",
               ].join(" ")}
             >
               {tab}

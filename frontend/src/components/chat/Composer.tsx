@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { AtSign, PlusCircle, Send, Smile } from "lucide-react";
 import { feedMeta } from "@/mockdata/chat";
-import { typingUser } from "@/mockdata/user";
 
 type ComposerProps = {
   onSend: (text: string) => void;
@@ -55,7 +54,7 @@ export default function Composer({ onSend }: ComposerProps) {
               <button
                 onClick={submitMessage}
                 disabled={!draft.trim()}
-                className="rounded-lg bg-[var(--primary)] p-2 text-[#07006c] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+                className="rounded-full bg-gradient-to-tr from-[var(--primary)] to-[var(--primary-container)] p-2.5 text-[#07006c] shadow-[0_0_20px_rgba(192,193,255,0.4)] transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:scale-100 disabled:shadow-none"
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -69,10 +68,14 @@ export default function Composer({ onSend }: ComposerProps) {
           </p>
 
           <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            <p className="text-[10px] text-[color:color-mix(in_srgb,var(--on-surface-variant)_70%,transparent)]">
-              {isDrafting ? "You are typing..." : `${typingUser.name} is typing...`}
-            </p>
+            {isDrafting && (
+              <>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <p className="text-[10px] text-[color:color-mix(in_srgb,var(--on-surface-variant)_70%,transparent)]">
+                  You are typing...
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
