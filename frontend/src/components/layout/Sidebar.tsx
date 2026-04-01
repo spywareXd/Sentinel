@@ -9,24 +9,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ProfileLogo from "@/components/ui/ProfileLogo";
+import { getPunishmentExpiry, isActivePunishment } from "@/lib/punishment";
+import type { UserPunishment } from "@/types/database/userPunishment";
 import { createClient } from "@/utils/supabase/client";
-
-const getFrontendPunishmentExpiry = (punishment: {
-  duration_hours: number | null;
-  issued_at: string | null;
-  expires_at: string | null;
-}) => {
-  if (punishment.duration_hours && punishment.issued_at) {
-    return new Date(
-      new Date(punishment.issued_at).getTime() + punishment.duration_hours * 60 * 1000,
-    );
-  }
-
-  return punishment.expires_at ? new Date(punishment.expires_at) : null;
-};
 
 const sidebarBrand = {
   name: "SentinelDAO",
@@ -51,18 +39,35 @@ const iconMap = {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("Loading...");
   const [userInitials, setUserInitials] = useState<string>("");
-  const [userStatusText, setUserStatusText] = useState<string>("Available");
-  const [isPunished, setIsPunished] = useState(false);
+  const [activePunishment, setActivePunishment] = useState<UserPunishment | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [assignedCaseCount, setAssignedCaseCount] = useState(0);
+  const hasForcedSignOut = useRef(false);
+
+  const activePunishmentExpiry = activePunishment ? getPunishmentExpiry(activePunishment) : null;
+  const isPunished =
+    Boolean(activePunishment) &&
+    (!activePunishmentExpiry || activePunishmentExpiry.getTime() > Date.now());
+  const userStatusText = activePunishment
+    ? activePunishment.punishment_type === "timeout" && activePunishmentExpiry
+      ? `Timed out until ${activePunishmentExpiry.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+        })}`
+      : `Punishment active: ${activePunishment.punishment_type}`
+    : "Available";
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        setUserId(session.user.id);
+
         const { data: profile } = await supabase.from('profiles').select('username').eq('id', session.user.id).single();
         const name = profile?.username || session.user.email || "Sentinel";
         setUserName(name);
@@ -76,35 +81,117 @@ export default function Sidebar() {
 
         setWalletAddress(walletProfile?.wallet_address?.toLowerCase() ?? null);
 
-        const { data: punishment } = await supabase
-          .from("user_punishments")
-          .select("punishment_type, duration_hours, issued_at, expires_at, is_active")
+      const { data: punishment } = await supabase
+        .from("user_punishments")
+        .select("punishment_type, duration, issued_at, expires_at, is_active")
           .eq("user_id", session.user.id)
           .eq("is_active", true)
           .order("issued_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (punishment?.is_active) {
-          const expiresAt = getFrontendPunishmentExpiry(punishment);
-          const stillActive = !expiresAt || expiresAt.getTime() > Date.now();
-
-          if (stillActive) {
-            setIsPunished(true);
-            setUserStatusText(
-              punishment.punishment_type === "timeout" && expiresAt
-                ? `Timed out until ${expiresAt.toLocaleDateString([], {
-                    month: "short",
-                    day: "numeric",
-                  })}`
-                : `Punishment active: ${punishment.punishment_type}`
-            );
-          }
-        }
+        setActivePunishment(
+          punishment?.is_active && isActivePunishment(punishment as UserPunishment)
+            ? (punishment as UserPunishment)
+            : null,
+        );
       }
     };
     fetchUser();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!activePunishmentExpiry) return;
+
+    const msUntilExpiry = activePunishmentExpiry.getTime() - Date.now();
+    const timeout = window.setTimeout(() => {
+      setActivePunishment(null);
+    }, Math.max(0, msUntilExpiry) + 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [activePunishmentExpiry]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const forceSignOutIfNeeded = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user || hasForcedSignOut.current || !isMounted) return;
+
+      const { data: punishment } = await supabase
+        .from("user_punishments")
+        .select("punishment_type, is_active, expires_at, issued_at, duration")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .order("issued_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!punishment?.is_active) {
+        setActivePunishment(null);
+        return;
+      }
+
+      const typedPunishment = punishment as UserPunishment;
+      const punishmentType = String(punishment.punishment_type || "").toLowerCase();
+      const expiresAt = getPunishmentExpiry(typedPunishment);
+      const isStillActive = !expiresAt || expiresAt.getTime() > Date.now();
+
+      if (!isStillActive) {
+        setActivePunishment(null);
+        return;
+      }
+
+      setActivePunishment(typedPunishment);
+
+      if (punishmentType === "kick" || punishmentType === "ban") {
+        hasForcedSignOut.current = true;
+        await supabase.auth.signOut();
+        router.replace(
+          `/login?message=${encodeURIComponent(
+            `Signed out due to active ${punishmentType} punishment.`,
+          )}`,
+        );
+      }
+    };
+
+    void forceSignOutIfNeeded();
+
+    const interval = window.setInterval(() => {
+      void forceSignOutIfNeeded();
+    }, 5000);
+
+    const channel = supabase
+      .channel("sidebar-punishment-enforcement")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_punishments" },
+        () => {
+          void forceSignOutIfNeeded();
+        },
+      )
+          .subscribe();
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [router, supabase, userId, walletAddress]);
+
+  useEffect(() => {
+    if (!activePunishmentExpiry) return;
+
+    const msUntilExpiry = activePunishmentExpiry.getTime() - Date.now();
+    const timeout = window.setTimeout(() => {
+      setActivePunishment(null);
+    }, Math.max(0, msUntilExpiry) + 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [activePunishmentExpiry]);
 
   useEffect(() => {
     if (!walletAddress) return;

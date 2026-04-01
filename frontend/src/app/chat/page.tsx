@@ -7,21 +7,12 @@ import Composer from "@/components/chat/Composer";
 import RightRail from "@/components/layout/RightRail";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
+import { getPunishmentExpiry, isActivePunishment } from "@/lib/punishment";
 import { roomDetails } from "@/mockdata/room";
 import type { UserPunishment } from "@/types/database/userPunishment";
 import type { Message } from "@/types/mockdata/chat";
 import type { RoomMember } from "@/types/mockdata/room";
 import { createClient } from "@/utils/supabase/client";
-
-const getFrontendPunishmentExpiry = (punishment: UserPunishment) => {
-  if (punishment.duration_hours && punishment.issued_at) {
-    return new Date(
-      new Date(punishment.issued_at).getTime() + punishment.duration_hours * 60 * 1000,
-    );
-  }
-
-  return punishment.expires_at ? new Date(punishment.expires_at) : null;
-};
 
 type ProfileSummary = {
   id: string;
@@ -51,7 +42,7 @@ export default function Home() {
 
   const formatPunishmentLabel = (punishment: UserPunishment) => {
     const type = punishment.punishment_type.replace(/[_-]+/g, " ");
-    const expiresAt = getFrontendPunishmentExpiry(punishment);
+    const expiresAt = getPunishmentExpiry(punishment);
 
     if (!expiresAt) {
       return `${type} active`;
@@ -105,7 +96,7 @@ export default function Home() {
 
       const { data: punishment } = await supabase
         .from("user_punishments")
-        .select("*")
+        .select("*, duration")
         .eq("user_id", user.id)
         .eq("is_active", true)
         .order("issued_at", { ascending: false })
@@ -114,10 +105,7 @@ export default function Home() {
 
       if (punishment) {
         const typedPunishment = punishment as UserPunishment;
-        const expiresAt = getFrontendPunishmentExpiry(typedPunishment);
-        const isStillActive = !expiresAt || expiresAt.getTime() > Date.now();
-
-        setActivePunishment(isStillActive ? typedPunishment : null);
+        setActivePunishment(isActivePunishment(typedPunishment) ? typedPunishment : null);
       } else {
         setActivePunishment(null);
       }
@@ -145,6 +133,70 @@ export default function Home() {
 
     getUser();
   }, [router, supabase]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    let isMounted = true;
+
+    const refreshActivePunishment = async () => {
+      const { data: punishment } = await supabase
+        .from("user_punishments")
+        .select("*, duration")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("issued_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (!punishment) {
+        setActivePunishment(null);
+        return;
+      }
+
+      const typedPunishment = punishment as UserPunishment;
+      setActivePunishment(isActivePunishment(typedPunishment) ? typedPunishment : null);
+    };
+
+    const channel = supabase
+      .channel(`chat-punishment-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_punishments" },
+        () => {
+          void refreshActivePunishment();
+        },
+      )
+      .subscribe();
+
+    void refreshActivePunishment();
+
+    const interval = window.setInterval(() => {
+      void refreshActivePunishment();
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, userId]);
+
+  useEffect(() => {
+    if (!activePunishment) return;
+
+    const expiresAt = getPunishmentExpiry(activePunishment);
+    if (!expiresAt) return;
+
+    const msUntilExpiry = expiresAt.getTime() - Date.now();
+    const timeout = window.setTimeout(() => {
+      setActivePunishment(null);
+    }, Math.max(0, msUntilExpiry) + 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [activePunishment]);
 
   // 2. Fetch historical messages + listen for realtime inserts
   useEffect(() => {
