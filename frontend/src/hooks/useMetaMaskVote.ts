@@ -27,7 +27,9 @@ const SENTINEL_ABI = [
   },
 ] as const;
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111 in hex
 
 export type VoteOption = "punish" | "dismiss";
@@ -119,7 +121,7 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
                     symbol: "ETH",
                     decimals: 18,
                   },
-                  rpcUrls: [process.env.NEXT_PUBLIC_RPC_URL],
+                  rpcUrls: [RPC_URL],
                   blockExplorerUrls: ["https://sepolia.etherscan.io"],
                 },
               ],
@@ -149,8 +151,7 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
 
       // --- 6. Sync result to backend ---
       setStatus("syncing");
-      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
-      const syncResp = await fetch(`${BACKEND}/moderation/vote/sync`, {
+      const syncResp = await fetch(`${BACKEND_URL}/moderation/vote/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
