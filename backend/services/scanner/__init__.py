@@ -27,11 +27,25 @@ def run_3_step_scan(message: str, message_id: str = None, chat_id: str = None) -
     analysis = analyze_case(message_id, context_str)
     
     # Combine results
+    threat_level = str(analysis.get("threat_level", "None")).strip().lower()
+    
+    # Calculate severe_score based on normalized threat level
+    if threat_level == "extreme":
+        severe_score = 1.0
+    elif threat_level == "high":
+        severe_score = 0.8
+    elif threat_level == "medium":
+        severe_score = 0.5
+    elif threat_level == "low":
+        severe_score = 0.2
+    else:
+        severe_score = 0.0
+
     return {
         "flagged": analysis.get("flagged", False),
         "reason": analysis.get("reason", "Unknown"),
         "harmful_score": analysis.get("confidence", 0.0),
-        "severe_score": (1.0 if analysis.get("threat_level") == "Extreme" else 0.8 if analysis.get("threat_level") == "High" else 0.5 if analysis.get("threat_level") == "Medium" else 0.2 if analysis.get("threat_level") == "Low" else 0.0),
+        "severe_score": severe_score,
         "punishment": analysis.get("action_recommended"),
         "punishment_duration": analysis.get("punishment_duration", 0),
         "step_reached": 3,

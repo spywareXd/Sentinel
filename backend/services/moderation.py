@@ -48,7 +48,7 @@ def select_random_moderators(exclude_user_id: str = None, count: int = 3) -> lis
         return []
 
 
-def create_moderation_case(message_id: str, user_id: str, content: str, severe_score: float) -> dict:
+def create_moderation_case(message_id: str, user_id: str, content: str, severe_score: float, ai_metadata: dict = None) -> dict:
     """
     Full flow:
     1. Select 3 random moderators
@@ -128,8 +128,13 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
             "moderator_3": mod_wallets[2],
             "status": "voting",
             "toxicity_score": severe_score,
+            "ai_reason": ai_metadata.get("reason") if ai_metadata else None,
+            "punishment_type": ai_metadata.get("punishment") if ai_metadata else None,
+            "punishment_duration": ai_metadata.get("punishment_duration") if ai_metadata else 0,
             "created_at": datetime.now(IST).isoformat()
         }
+        
+        print(f"Creating case in DB with toxicity_score: {final_score}")
         
         insert_resp = supabase.table("moderation_cases").insert(case_data).execute()
         
@@ -233,32 +238,8 @@ def check_and_update_resolved_cases():
                 }).eq("id", case["id"]).execute()
                 
                 print(f"Case {case['blockchain_case_id']} resolved: {decision.upper()}")
-                
-                # If punished, increment warnings on the offender's profile
-                if decision == "punish":
-                    case_full = supabase.table("moderation_cases") \
-                        .select("offender_id") \
-                        .eq("id", case["id"]) \
-                        .single() \
-                        .execute()
-                    
-                    if case_full.data and case_full.data.get("offender_id"):
-                        offender_id = case_full.data["offender_id"]
-                        
-                        # Get current warnings
-                        profile = supabase.table("profiles") \
-                            .select("warnings") \
-                            .eq("id", offender_id) \
-                            .single() \
-                            .execute()
-                        
-                        current_warnings = (profile.data or {}).get("warnings", 0) or 0
-                        
-                        supabase.table("profiles").update({
-                            "warnings": current_warnings + 1
-                        }).eq("id", offender_id).execute()
-                        
-                        print(f"Warning count for offender {offender_id}: {current_warnings} -> {current_warnings + 1}")
+                # Note: Warnings and Punishment records are now handled by the 
+                # Supabase PostgreSQL trigger for atomicity and consistency.
                 
     except Exception as e:
         print(f"Error checking resolved cases: {e}")

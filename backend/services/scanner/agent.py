@@ -37,6 +37,7 @@ STRICT RULES YOU MUST FOLLOW:
 5. Only when you absolutely need more context due to ambiguity, call the tool.
 6. If you have enough context, provide a final decision.
 7. YOUR FINAL OUTPUT MUST BE ONLY THE JSON OBJECT. NO PREAMBLE. NO EXPLANATION.
+8. CRITICAL FLAG RULE: If any profanity, slurs, or cussing are present, you MUST set "flagged": true, even if the threat level is "Low" or "None". The DAO must decide on the final verdict for all profanity.
 
 JSON STRUCTURE:
 {{

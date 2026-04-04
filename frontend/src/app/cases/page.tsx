@@ -59,11 +59,11 @@ interface DbCase {
   messages?: {
     harmful_score?: number;
     severe_score?: number;
-    reason?: string;
     content?: string;
-    punishment?: string | null;
-    punishment_duration?: number | null;
   };
+  ai_reason?: string | null;
+  punishment_type?: string | null;
+  punishment_duration?: number | null;
   tx_hash?: string | null;
   offender?: {
     username?: string;
@@ -76,13 +76,13 @@ interface DbCase {
 }
 
 const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
-  const harmfulScore = dbCase.messages?.harmful_score ?? dbCase.toxicity_score ?? 0;
-  const severeScore = dbCase.messages?.severe_score ?? 0;
+  const harmfulScore = dbCase.toxicity_score ?? 0;
+  const severeScore = dbCase.toxicity_score ?? 0;
   const decision = mapDecision(dbCase.decision);
   const status = mapStatus(dbCase.status);
   const openedAt = formatTimestamp(dbCase.created_at) ?? "Recently opened";
   const resolvedAt = formatTimestamp(dbCase.updated_at);
-  const reason = dbCase.messages?.reason || "flagged content";
+  const reason = dbCase.ai_reason || "flagged content";
   const offenderName =
     dbCase.offender?.username ||
     dbCase.offender?.wallet_address?.slice(0, 10) ||
@@ -105,7 +105,7 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
     wasAssignedToMe: true,
     needsVote: status !== "Resolved",
     harmfulScore,
-    aiReason: reason,
+    aiReason: dbCase.ai_reason ?? "No reason provided",
     offender: offenderName,
     reporter: "Scanner",
     flaggedMessage: dbCase.messages?.content ?? "Original message unavailable.",
@@ -129,8 +129,8 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
       dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
         ? Number(dbCase.blockchain_case_id)
         : null,
-    punishmentType: dbCase.messages?.punishment ?? null,
-    punishmentDuration: dbCase.messages?.punishment_duration ?? null,
+    punishmentType: dbCase.punishment_type ?? null,
+    punishmentDuration: dbCase.punishment_duration ?? null,
     txHash: dbCase.tx_hash ?? null,
   };
 };
@@ -236,7 +236,7 @@ export default function CasesPage() {
       const { data, error } = await supabase
         .from("moderation_cases")
         .select(
-          "*, messages:message_id(content, harmful_score, severe_score, reason, punishment, punishment_duration), offender:offender_id(username, wallet_address, warnings)"
+          "*, messages:message_id(content), offender:offender_id(username, wallet_address, warnings)"
         )
         .or(
           `moderator_1.eq.${walletAddress},moderator_2.eq.${walletAddress},moderator_3.eq.${walletAddress}`
