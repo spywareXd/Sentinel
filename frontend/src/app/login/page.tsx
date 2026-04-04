@@ -1,16 +1,26 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Shield, QrCode, UserRound, Wallet } from 'lucide-react';
 import { login } from '@/app/actions/auth';
 
+// Isolated to its own component so it can be wrapped in Suspense
+function MessageBanner() {
+  const searchParams = useSearchParams();
+  const message = searchParams.get('message');
+  if (!message) return null;
+  return (
+    <div className="mb-4 p-3 bg-surface-container-high border border-outline-variant/30 text-primary text-sm rounded-xl text-center">
+      {message}
+    </div>
+  );
+}
+
 export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const searchParams = useSearchParams();
-  const message = searchParams.get('message');
 
   const handleSubmit = async (formData: FormData) => {
     setLoading(true);
@@ -45,11 +55,10 @@ export default function Login() {
             <p className="text-on-surface-variant text-[15px]">Sign in to your digital orbit</p>
           </div>
 
-          {message && (
-            <div className="mb-4 p-3 bg-surface-container-high border border-outline-variant/30 text-primary text-sm rounded-xl text-center">
-              {message}
-            </div>
-          )}
+          {/* Suspense boundary required for useSearchParams() in production builds */}
+          <Suspense fallback={null}>
+            <MessageBanner />
+          </Suspense>
 
           {error && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl text-center">
