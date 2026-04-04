@@ -27,4 +27,7 @@ export type CaseRecord = {
   outcome: string;
   chainRef: string;
   blockchainCaseId: number | null;
+  punishmentType: string | null;
+  punishmentDuration: number | null;
+  txHash: string | null;
 };

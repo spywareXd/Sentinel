@@ -82,6 +82,11 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
     vote: VoteOption,
     moderatorAddress: string
   ) => {
+    // --- 0. Prevent parallel calls ---
+    if (status !== "idle" && status !== "success" && status !== "error") {
+      return;
+    }
+
     setError(null);
     setTxHash(null);
 

@@ -120,7 +120,7 @@ export default function CaseList({
                   <span className="text-[10px] font-black text-[var(--on-surface-variant)]">
                     {caseItem.status === "Resolved"
                       ? caseItem.decision
-                      : `${Math.round(caseItem.harmfulScore * 100)}% SIGNAL`}
+                      : `${Math.round(caseItem.harmfulScore * 100)}%`}
                   </span>
                 </div>
               </div>

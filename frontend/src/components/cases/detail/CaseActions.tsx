@@ -27,6 +27,12 @@ export default function CaseActions({
   const { status, txHash, error, castVote, reset } = useMetaMaskVote();
 
   const handleVote = async (vote: VoteOption) => {
+    // 1. Guard against parallel calls
+    if (status !== "idle" && status !== "success" && status !== "error") {
+      return;
+    }
+
+    // 2. Validate prerequisites
     if (blockchainCaseId === null) {
       alert(
         "This case hasn't been registered on the blockchain yet. Please wait or retry chain sync."
@@ -40,6 +46,7 @@ export default function CaseActions({
       return;
     }
 
+    // 3. Initiate vote
     setPendingVote(vote);
     setIsModalOpen(true);
     reset();
@@ -68,6 +75,7 @@ export default function CaseActions({
   }
 
   const noChain = blockchainCaseId === null;
+  const isVoting = status !== "idle" && status !== "success" && status !== "error";
 
   return (
     <>
@@ -82,21 +90,19 @@ export default function CaseActions({
             type="button"
             id="case-action-dismiss"
             onClick={() => handleVote("dismiss")}
-            disabled={noChain}
+            disabled={noChain || isVoting}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--surface-container-highest)] py-3 text-sm font-bold text-[var(--on-surface)] transition-colors hover:bg-[var(--surface-bright)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[var(--surface-container-highest)]"
           >
-            <span className="text-base leading-none">🦊</span>
             Dismiss
           </button>
           <button
             type="button"
             id="case-action-punish"
             onClick={() => handleVote("punish")}
-            disabled={noChain}
+            disabled={noChain || isVoting}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#b91c1c] bg-gradient-to-b from-[#ef4444] to-[#dc2626] py-3 text-sm font-bold text-white shadow-[0_3px_8px_rgba(127,29,29,0.16)] transition-[transform,box-shadow,filter] hover:brightness-105 hover:shadow-[0_5px_12px_rgba(127,29,29,0.2)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-[0_3px_8px_rgba(127,29,29,0.16)]"
           >
-            <span className="text-base leading-none">🦊</span>
-            Vote: Punish
+            Approve
           </button>
         </div>
       </div>
