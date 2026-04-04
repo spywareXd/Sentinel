@@ -31,8 +31,9 @@ def run_3_step_scan(message: str, message_id: str = None, chat_id: str = None) -
         "flagged": analysis.get("flagged", False),
         "reason": analysis.get("reason", "Unknown"),
         "harmful_score": analysis.get("confidence", 0.0),
-        "severe_score": (1.0 if analysis.get("threat_level") == "High" else 0.5 if analysis.get("threat_level") == "Medium" else 0.0),
+        "severe_score": (1.0 if analysis.get("threat_level") == "Extreme" else 0.8 if analysis.get("threat_level") == "High" else 0.5 if analysis.get("threat_level") == "Medium" else 0.2 if analysis.get("threat_level") == "Low" else 0.0),
         "punishment": analysis.get("action_recommended"),
+        "punishment_duration": analysis.get("punishment_duration", 0),
         "step_reached": 3,
         "details": analysis
     }
@@ -50,6 +51,7 @@ def scan(message, warning_count=0, message_id=None, chat_id=None):
         "harmful_score": result.get("harmful_score", 0.0),
         "severe_score": result.get("severe_score", 0.0),
         "punishment": result.get("punishment"),
+        "punishment_duration": result.get("punishment_duration", 0),
         "step_reached": result.get("step_reached"),
         "details": result.get("details", {})
     }
