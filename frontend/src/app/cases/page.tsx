@@ -21,8 +21,8 @@ const toTitleCase = (value: string) =>
     .join(" ");
 
 const getSeverity = (harmfulScore: number, severeScore: number) => {
-  if (severeScore >= 0.75 || harmfulScore >= 0.8) return "High";
-  if (severeScore >= 0.45 || harmfulScore >= 0.5) return "Medium";
+  if (severeScore >= 0.75 || harmfulScore >= 0.75) return "High";
+  if (severeScore >= 0.4 || harmfulScore >= 0.4) return "Medium";
   return "Low";
 };
 
@@ -38,6 +38,13 @@ const formatTimestamp = (value?: string | null) => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+const getTimestamp = (value?: string | null) => {
+  if (!value) return 0;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 };
 
 const mapDecision = (decision?: string | null): CaseDecision => {
@@ -57,12 +64,7 @@ interface DbCase {
   created_at?: string;
   updated_at?: string;
   messages?: {
-    harmful_score?: number;
-    severe_score?: number;
-    reason?: string;
     content?: string;
-    punishment?: string | null;
-    punishment_duration?: number | null;
   };
   tx_hash?: string | null;
   offender?: {
@@ -76,13 +78,14 @@ interface DbCase {
 }
 
 const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
-  const harmfulScore = dbCase.messages?.harmful_score ?? dbCase.toxicity_score ?? 0;
-  const severeScore = dbCase.messages?.severe_score ?? 0;
+  const harmfulScore = dbCase.toxicity_score ?? 0;
+  const severeScore = dbCase.toxicity_score ?? 0;
   const decision = mapDecision(dbCase.decision);
   const status = mapStatus(dbCase.status);
   const openedAt = formatTimestamp(dbCase.created_at) ?? "Recently opened";
   const resolvedAt = formatTimestamp(dbCase.updated_at);
-  const reason = dbCase.messages?.reason || "flagged content";
+  const reason =
+    dbCase.decision ? `${dbCase.decision} review` : "flagged content";
   const offenderName =
     dbCase.offender?.username ||
     dbCase.offender?.wallet_address?.slice(0, 10) ||
@@ -94,6 +97,7 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
       dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
         ? `#${dbCase.blockchain_case_id}`
         : `#${String(dbCase.id).slice(0, 6).toUpperCase()}`,
+    createdAtTimestamp: getTimestamp(dbCase.created_at),
     title: toTitleCase(reason),
     category: toTitleCase(reason),
     severity: getSeverity(harmfulScore, severeScore),
@@ -129,8 +133,8 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
       dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
         ? Number(dbCase.blockchain_case_id)
         : null,
-    punishmentType: dbCase.messages?.punishment ?? null,
-    punishmentDuration: dbCase.messages?.punishment_duration ?? null,
+    punishmentType: null,
+    punishmentDuration: null,
     txHash: dbCase.tx_hash ?? null,
   };
 };
@@ -141,7 +145,6 @@ export default function CasesPage() {
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [activeTopTab, setActiveTopTab] = useState<TopTab>("Assigned");
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [isDetailDismissed, setIsDetailDismissed] = useState(false);
   const [searchQuery] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
@@ -171,28 +174,15 @@ export default function CasesPage() {
         if (left.status !== "Resolved" && right.status === "Resolved") return -1;
         if (left.assignedToMe && !right.assignedToMe) return -1;
         if (!left.assignedToMe && right.assignedToMe) return 1;
-        return right.harmfulScore - left.harmfulScore;
+        return right.createdAtTimestamp - left.createdAtTimestamp;
       });
   }, [cases, activeTopTab, searchQuery]);
-
-  // Syncing state when filteredCases changes via useEffect to avoid render-body state updates
-  useEffect(() => {
-    if (filteredCases.length === 0) {
-      if (selectedCaseId !== null) setSelectedCaseId(null);
-    } else {
-      const hasSelected = filteredCases.some((c) => c.id === selectedCaseId);
-      if (!selectedCaseId || !hasSelected) {
-        if (selectedCaseId !== filteredCases[0].id) {
-          setSelectedCaseId(filteredCases[0].id);
-        }
-      }
-    }
-  }, [filteredCases, selectedCaseId]);
 
   const selectedCase =
     (selectedCaseId
       ? filteredCases.find((caseItem) => caseItem.id === selectedCaseId)
       : null) ??
+    filteredCases[0] ??
     null;
 
   const summary = useMemo(
@@ -236,7 +226,7 @@ export default function CasesPage() {
       const { data, error } = await supabase
         .from("moderation_cases")
         .select(
-          "*, messages:message_id(content, harmful_score, severe_score, reason, punishment, punishment_duration), offender:offender_id(username, wallet_address, warnings)"
+          "*, messages:message_id(content), offender:offender_id(username, wallet_address, warnings)"
         )
         .or(
           `moderator_1.eq.${walletAddress},moderator_2.eq.${walletAddress},moderator_3.eq.${walletAddress}`
@@ -244,7 +234,12 @@ export default function CasesPage() {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Error loading cases:", error);
+        console.error("Error loading cases:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
         setCases([]);
         setSelectedCaseId(null);
         setIsLoading(false);

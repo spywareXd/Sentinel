@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ProfileLogo from "@/components/ui/ProfileLogo";
 import { createClient } from "@/utils/supabase/client";
 
@@ -23,7 +23,7 @@ const sidebarBrand = {
 const navItems = [
   { label: "Feed", icon: "home", href: "/chat" },
   { label: "Cases", icon: "shield", href: "/cases" },
-  { label: "Activity", icon: "gavel", href: "#" },
+  { label: "Activity", icon: "gavel", href: "/activity" },
   { label: "Settings", icon: "settings", href: "#" },
 ] as const;
 
@@ -37,7 +37,7 @@ const iconMap = {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [userName, setUserName] = useState<string>("Loading...");
   const [userInitials, setUserInitials] = useState<string>("");
 
@@ -52,7 +52,7 @@ export default function Sidebar() {
       }
     };
     fetchUser();
-  }, []);
+  }, [supabase]);
 
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col bg-[var(--surface-container-low)] px-4 py-4 text-[var(--on-surface)]">
