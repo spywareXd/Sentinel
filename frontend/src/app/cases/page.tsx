@@ -10,6 +10,8 @@ import Sidebar from "@/components/layout/Sidebar";
 import type { CaseDecision, CaseRecord } from "@/types/mockdata/cases";
 import { createClient } from "@/utils/supabase/client";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+
 type TopTab = "Assigned" | "History";
 
 const toTitleCase = (value: string) =>
@@ -59,9 +61,12 @@ interface DbCase {
   messages?: {
     harmful_score?: number;
     severe_score?: number;
-    reason?: string;
     content?: string;
   };
+  ai_reason?: string | null;
+  punishment_type?: string | null;
+  punishment_duration?: number | null;
+  tx_hash?: string | null;
   offender?: {
     username?: string;
     wallet_address?: string;
@@ -73,13 +78,13 @@ interface DbCase {
 }
 
 const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
-  const harmfulScore = dbCase.messages?.harmful_score ?? dbCase.toxicity_score ?? 0;
-  const severeScore = dbCase.messages?.severe_score ?? 0;
+  const harmfulScore = dbCase.toxicity_score ?? 0;
+  const severeScore = dbCase.toxicity_score ?? 0;
   const decision = mapDecision(dbCase.decision);
   const status = mapStatus(dbCase.status);
   const openedAt = formatTimestamp(dbCase.created_at) ?? "Recently opened";
   const resolvedAt = formatTimestamp(dbCase.updated_at);
-  const reason = dbCase.messages?.reason || "flagged content";
+  const reason = dbCase.ai_reason || "flagged content";
   const offenderName =
     dbCase.offender?.username ||
     dbCase.offender?.wallet_address?.slice(0, 10) ||
@@ -102,7 +107,7 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
     wasAssignedToMe: true,
     needsVote: status !== "Resolved",
     harmfulScore,
-    aiReason: reason,
+    aiReason: dbCase.ai_reason ?? "No reason provided",
     offender: offenderName,
     reporter: "Scanner",
     flaggedMessage: dbCase.messages?.content ?? "Original message unavailable.",
@@ -126,6 +131,9 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
       dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
         ? Number(dbCase.blockchain_case_id)
         : null,
+    punishmentType: dbCase.punishment_type ?? null,
+    punishmentDuration: dbCase.punishment_duration ?? null,
+    txHash: dbCase.tx_hash ?? null,
   };
 };
 
@@ -136,7 +144,7 @@ export default function CasesPage() {
   const [activeTopTab, setActiveTopTab] = useState<TopTab>("Assigned");
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [isDetailDismissed, setIsDetailDismissed] = useState(false);
-  const [searchQuery] = useState(""); // Restored searchQuery state
+  const [searchQuery] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -169,10 +177,8 @@ export default function CasesPage() {
       });
   }, [cases, activeTopTab, searchQuery]);
 
-  // Syncing state during render to avoid cascading useEffect renders
-  const [prevFiltered, setPrevFiltered] = useState(filteredCases);
-  if (filteredCases !== prevFiltered) {
-    setPrevFiltered(filteredCases);
+  // Syncing state when filteredCases changes via useEffect to avoid render-body state updates
+  useEffect(() => {
     if (filteredCases.length === 0) {
       if (selectedCaseId !== null) setSelectedCaseId(null);
     } else {
@@ -183,7 +189,7 @@ export default function CasesPage() {
         }
       }
     }
-  }
+  }, [filteredCases, selectedCaseId]);
 
   const selectedCase =
     (selectedCaseId
@@ -233,25 +239,21 @@ export default function CasesPage() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("moderation_cases")
-        .select(
-          "*, messages:message_id(content), offender:offender_id(username, wallet_address)"
-        )
-        .or(
-          `moderator_1.eq.${walletAddress},moderator_2.eq.${walletAddress},moderator_3.eq.${walletAddress}`
-        )
-        .order("created_at", { ascending: false });
+      const resp = await fetch(
+        `${BACKEND_URL}/moderation/my-cases?wallet_address=${encodeURIComponent(walletAddress)}`,
+        { cache: "no-store" }
+      );
 
-      if (error) {
-        console.error("Error loading cases:", error);
+      if (!resp.ok) {
+        console.error("Error loading cases:", await resp.text().catch(() => "Unknown backend error"));
         setCases([]);
         setSelectedCaseId(null);
         setIsLoading(false);
         return;
       }
 
-      const mappedCases = (data ?? []).map(mapCaseRecord);
+      const payload = (await resp.json()) as { cases?: DbCase[] };
+      const mappedCases = (payload.cases ?? []).map(mapCaseRecord);
       setCases(mappedCases);
       setIsLoading(false);
     };
@@ -374,7 +376,10 @@ export default function CasesPage() {
                 <CaseDetailPanel
                   caseItem={selectedCase}
                   moderatorAddress={moderatorWallet}
-                  onVoteSuccess={(decision) => resolveCase(selectedCase.id, decision)}
+                  onVoteSuccess={(decision) => {
+                    resolveCase(selectedCase.id, decision);
+                    setRefreshKey((currentKey) => currentKey + 1);
+                  }}
                 />
               </div>
             ) : (

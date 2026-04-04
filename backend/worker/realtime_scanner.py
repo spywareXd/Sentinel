@@ -48,14 +48,9 @@ async def scan_unprocessed():
             # Run scanner
             result = scan(msg["content"], warning_count=warning_count)
             
-            # Update message with scan results
+            # Update message - Keep it lean (only flag and timestamp)
             supabase.table("messages").update({
                 "flagged": result["flagged"],
-                "reason": result["reason"],
-                "harmful_score": result["harmful_score"],
-                "severe_score": result["severe_score"],
-                "punishment": result["punishment"],
-                "punishment_duration": result["punishment_duration"],
                 "processed_at": datetime.now(IST).isoformat()
             }).eq("id", msg["id"]).execute()
             
@@ -79,7 +74,8 @@ async def scan_unprocessed():
                         message_id=msg["id"],
                         user_id=msg["user_id"],
                         content=msg["content"],
-                        severe_score=result["severe_score"]
+                        severe_score=result["severe_score"],
+                        ai_metadata=result  # Pass the full AI analysis
                     )
                     
                     if case_result["success"]:

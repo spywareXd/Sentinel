@@ -3,7 +3,6 @@ import CaseDetailHeader from "@/components/cases/detail/CaseDetailHeader";
 import CaseFlaggedMessageCard from "@/components/cases/detail/CaseFlaggedMessageCard";
 import CaseInsightSection from "@/components/cases/detail/CaseInsightSection";
 import CaseProofCard from "@/components/cases/detail/CaseProofCard";
-import CaseVoteProgress from "@/components/cases/detail/CaseVoteProgress";
 import type { CaseRecord } from "@/types/mockdata/cases";
 
 type CaseDetailPanelProps = {
@@ -27,7 +26,6 @@ export default function CaseDetailPanel({
       <div className="premium-scrollbar flex-1 space-y-6 overflow-y-auto pr-2">
         <CaseFlaggedMessageCard caseItem={caseItem} />
         <CaseInsightSection caseItem={caseItem} />
-        <CaseVoteProgress caseItem={caseItem} />
         <CaseProofCard caseItem={caseItem} />
       </div>
 

@@ -48,7 +48,7 @@ def select_random_moderators(exclude_user_id: str = None, count: int = 3) -> lis
         return []
 
 
-def create_moderation_case(message_id: str, user_id: str, content: str, severe_score: float) -> dict:
+def create_moderation_case(message_id: str, user_id: str, content: str, severe_score: float, ai_metadata: dict = None) -> dict:
     """
     Full flow:
     1. Select 3 random moderators
@@ -128,8 +128,13 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
             "moderator_3": mod_wallets[2],
             "status": "voting",
             "toxicity_score": severe_score,
+            "ai_reason": ai_metadata.get("reason") if ai_metadata else None,
+            "punishment_type": ai_metadata.get("punishment") if ai_metadata else None,
+            "punishment_duration": ai_metadata.get("punishment_duration") if ai_metadata else 0,
             "created_at": datetime.now(IST).isoformat()
         }
+        
+        print(f"Creating case in DB with toxicity_score: {severe_score}")
         
         insert_resp = supabase.table("moderation_cases").insert(case_data).execute()
         
@@ -149,23 +154,35 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
         
         if chain_result["success"]:
             blockchain_case_id = chain_result["case_id"]
+            tx_hash = chain_result["tx_hash"]
             
-            # Update Supabase case with blockchain case ID
-            supabase.table("moderation_cases").update({
-                "blockchain_case_id": blockchain_case_id,
-                "status": "voting"
-            }).eq("id", supabase_case_id).execute()
-            
-            print("Moderation case fully created.")
-            print(f"   Supabase ID: {supabase_case_id}")
-            print(f"   Blockchain Case ID: {blockchain_case_id}")
-            print(f"   TX: {chain_result['tx_hash']}")
+            print(f"Case {blockchain_case_id} created on-chain. TX: {tx_hash}")
+
+            # --- CRITICAL: Save blockchain_case_id and set status to voting ---
+            # This is essential for the case to be votable in the frontend.
+            try:
+                # First attempt: Try to save EVERYTHING (including tx_hash if column exists)
+                supabase.table("moderation_cases").update({
+                    "blockchain_case_id": blockchain_case_id,
+                    "tx_hash": tx_hash,
+                    "status": "voting"
+                }).eq("id", supabase_case_id).execute()
+                print("   Saved case ID and transaction hash to DB.")
+            except Exception as e:
+                # Second attempt fallback: If tx_hash column is missing, just save case_id
+                print(f"   Warning: Could not save tx_hash (col might be missing: {e})")
+                print("   Falling back to basic case registration...")
+                supabase.table("moderation_cases").update({
+                    "blockchain_case_id": blockchain_case_id,
+                    "status": "voting"
+                }).eq("id", supabase_case_id).execute()
+                print("   Basic case registration successful. Voting is now ENABLED.")
             
             return {
                 "success": True,
                 "supabase_case_id": supabase_case_id,
                 "blockchain_case_id": blockchain_case_id,
-                "tx_hash": chain_result["tx_hash"],
+                "tx_hash": tx_hash,
                 "moderators": mod_wallets
             }
         else:
@@ -191,62 +208,60 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
 
 def check_and_update_resolved_cases():
     """
-    Poll blockchain for resolved cases and update Supabase.
-    Called periodically by the scanner loop.
+    Poll blockchain for resolved cases OR 2/3 majority consensus.
+    Updates Supabase to trigger automated punishments.
     """
     try:
         # Get all cases that are still 'voting' in Supabase
         resp = supabase.table("moderation_cases") \
-            .select("id, blockchain_case_id") \
+            .select("id, blockchain_case_id, moderator_1, moderator_2, moderator_3") \
             .eq("status", "voting") \
             .not_.is_("blockchain_case_id", "null") \
             .execute()
         
         pending_cases = resp.data or []
-        
         if not pending_cases:
             return
         
-        from services.blockchain import get_case_from_chain
+        from services.blockchain import get_case_from_chain, verify_vote_on_chain
         
         for case in pending_cases:
-            chain_data = get_case_from_chain(case["blockchain_case_id"])
-            
-            if chain_data and chain_data["resolved"]:
-                decision = "punish" if chain_data["decision"] == 1 else "dismiss"
+            try:
+                bc_id = case["blockchain_case_id"]
+                chain_data = get_case_from_chain(bc_id)
+                if not chain_data:
+                    continue
+
+                # --- OPTION A: Blockchain is already officially resolved ---
+                if chain_data["resolved"]:
+                    decision = "punish" if chain_data["decision"] == 1 else "dismiss"
+                    print(f"[SYNC] Case {bc_id} officially resolved on-chain: {decision}")
+                    supabase.table("moderation_cases").update({"status": "resolved", "decision": decision}).eq("id", case["id"]).execute()
+                    continue
+
+                # --- OPTION B: Pro-active 2/3 Majority Check ---
+                mods = [case["moderator_1"], case["moderator_2"], case["moderator_3"]]
+                votes = {"punish": 0, "dismiss": 0}
                 
-                supabase.table("moderation_cases").update({
-                    "status": "resolved",
-                    "decision": decision
-                }).eq("id", case["id"]).execute()
-                
-                print(f"Case {case['blockchain_case_id']} resolved: {decision.upper()}")
-                
-                # If punished, increment warnings on the offender's profile
-                if decision == "punish":
-                    case_full = supabase.table("moderation_cases") \
-                        .select("offender_id") \
-                        .eq("id", case["id"]) \
-                        .single() \
-                        .execute()
-                    
-                    if case_full.data and case_full.data.get("offender_id"):
-                        offender_id = case_full.data["offender_id"]
-                        
-                        # Get current warnings
-                        profile = supabase.table("profiles") \
-                            .select("warnings") \
-                            .eq("id", offender_id) \
-                            .single() \
-                            .execute()
-                        
-                        current_warnings = (profile.data or {}).get("warnings", 0) or 0
-                        
-                        supabase.table("profiles").update({
-                            "warnings": current_warnings + 1
-                        }).eq("id", offender_id).execute()
-                        
-                        print(f"Warning count for offender {offender_id}: {current_warnings} -> {current_warnings + 1}")
+                for mod_addr in mods:
+                    if not mod_addr: continue
+                    v_check = verify_vote_on_chain(bc_id, mod_addr)
+                    if v_check["vote"] == 1: votes["punish"] += 1
+                    elif v_check["vote"] == 2: votes["dismiss"] += 1
+
+                determined_decision = None
+                if votes["punish"] >= 2: determined_decision = "punish"
+                elif votes["dismiss"] >= 2: determined_decision = "dismiss"
+
+                if determined_decision:
+                    print(f"[SYNC] Case {bc_id} reached 2/3 majority pro-actively: {determined_decision}")
+                    supabase.table("moderation_cases").update({
+                        "status": "resolved",
+                        "decision": determined_decision
+                    }).eq("id", case["id"]).execute()
+            except Exception as case_error:
+                print(f"   [SYNC Error] Skipping Case {case.get('blockchain_case_id', 'unknown')}: {case_error}")
+                continue
                 
     except Exception as e:
-        print(f"Error checking resolved cases: {e}")
+        print(f"CRITICAL Error in background resolution sync loop: {e}")
