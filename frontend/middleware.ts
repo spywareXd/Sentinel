@@ -1,11 +1,10 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
+  console.log("MINIMAL_MIDDLEWARE_V2_RUNNING", request.nextUrl.pathname);
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)",
-  ],
+  matcher: ["/:path*"],
 };
