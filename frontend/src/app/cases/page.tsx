@@ -290,7 +290,6 @@ export default function CasesPage() {
         !detailPanelRef.current.contains(event.target) &&
         !event.target.closest("[data-case-list-root='true']")
       ) {
-        setIsDetailDismissed(true);
         setSelectedCaseId(null);
       }
     };
@@ -304,7 +303,6 @@ export default function CasesPage() {
 
   const resetCases = () => {
     setRefreshKey((currentKey) => currentKey + 1);
-    setIsDetailDismissed(false);
     setActiveTopTab("Assigned");
   };
 
@@ -317,7 +315,6 @@ export default function CasesPage() {
           activeTopTab={activeTopTab}
           onTopTabChange={(tab) => {
             setActiveTopTab(tab);
-            setIsDetailDismissed(false);
           }}
         />
 
@@ -357,7 +354,6 @@ export default function CasesPage() {
                 selectedCaseId={selectedCase?.id ?? ""}
                 onSelectCase={(caseId) => {
                   setSelectedCaseId(caseId);
-                  setIsDetailDismissed(false);
                 }}
               />
             )}
