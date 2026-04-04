@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, QrCode, UserRound, Wallet } from 'lucide-react';
 import { login } from '@/app/actions/auth';
 
@@ -23,14 +23,20 @@ function MessageBanner() {
 export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleSubmit = async (formData: FormData) => {
     setLoading(true);
     setError(null);
     const result = await login(formData);
+    
     if (result?.error) {
       setError(result.error);
       setLoading(false);
+    } else {
+      const redirectTo = searchParams.get('redirectTo') || '/chat';
+      router.replace(redirectTo);
     }
   };
 

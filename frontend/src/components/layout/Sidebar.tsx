@@ -4,6 +4,7 @@ import {
   Gavel,
   HelpCircle,
   Home,
+  LogOut,
   Settings,
   Shield,
   Sparkles,
@@ -12,6 +13,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import ProfileLogo from "@/components/ui/ProfileLogo";
+import { useAuth } from "@/hooks/use-auth";
 import { createClient } from "@/utils/supabase/client";
 
 const sidebarBrand = {
@@ -37,22 +39,40 @@ const iconMap = {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user, isLoading: isAuthLoading, signOut } = useAuth();
   const supabase = createClient();
-  const [userName, setUserName] = useState<string>("Loading...");
-  const [userInitials, setUserInitials] = useState<string>("");
+  const [userName, setUserName] = useState<string>("Sentinel");
+  const [userInitials, setUserInitials] = useState<string>("S");
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data: profile } = await supabase.from('profiles').select('username').eq('id', session.user.id).single();
-        const name = profile?.username || session.user.email || "Sentinel";
+    const fetchProfile = async () => {
+      if (user) {
+        console.log("Fetching profile for user:", user.id);
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", user.id)
+          .single();
+        
+        if (error) {
+          console.error("Error fetching profile:", error);
+        }
+
+        const name = profile?.username || user.email?.split('@')[0] || "Sentinel";
+        console.log("Setting user name to:", name);
         setUserName(name);
         setUserInitials(name.substring(0, 1).toUpperCase());
       }
     };
-    fetchUser();
-  }, []);
+
+    if (!isAuthLoading) {
+      fetchProfile();
+    }
+  }, [user, isAuthLoading, supabase]);
+
+  // Optionally show a different state while auth is loading
+  const displayUserName = isAuthLoading ? "Loading..." : userName;
+  const displayUserInitials = isAuthLoading ? "..." : userInitials;
 
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col bg-[var(--surface-container-low)] px-4 py-4 text-[var(--on-surface)]">
@@ -99,27 +119,35 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-4 pt-4">
+      <div className="mt-4 pt-4 border-t border-[var(--outline-variant)]/20">
         <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]">
           <HelpCircle className="h-4 w-4" />
           <span className="font-medium">Help</span>
         </button>
 
+        <button
+          onClick={() => signOut()}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[var(--on-surface-variant)] transition-colors hover:bg-red-500/10 hover:text-red-400"
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="font-medium">Log out</span>
+        </button>
+
         <div className="mt-4 rounded-xl bg-[var(--surface-container-high)] p-3 hover:bg-[var(--surface-container-highest)] transition-colors cursor-pointer">
           <div className="flex items-center gap-3">
             <ProfileLogo
-              name={userName}
-              initials={userInitials}
+              name={displayUserName}
+              initials={displayUserInitials}
               className="h-10 w-10 rounded-lg object-cover"
               fallbackClassName="flex h-10 w-10 items-center justify-center rounded-lg bg-[color:color-mix(in_srgb,var(--primary)_18%,transparent)] text-sm font-bold text-[var(--primary)]"
             />
 
-            <div className="min-w-0">
+            <div className="min-w-0 pr-2">
               <p className="truncate text-sm font-semibold text-[var(--on-surface)]">
-                {userName}
+                {displayUserName}
               </p>
               <p className="truncate text-xs text-[var(--on-surface-variant)]">
-                Available
+                {isAuthLoading ? "Verifying session..." : "Available"}
               </p>
             </div>
           </div>

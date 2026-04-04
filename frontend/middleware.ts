@@ -25,20 +25,35 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session — do NOT add logic between createServerClient and getUser()
+  // Refresh session and check user
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect routes: redirect unauthenticated users to /login
-  const publicRoutes = ["/login", "/register", "/forgot-password", "/auth"];
-  const isPublicRoute = publicRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  );
+  const pathname = request.nextUrl.pathname;
 
-  if (!user && !isPublicRoute && request.nextUrl.pathname !== "/") {
+  // Configuration
+  const authRoutes = ["/login", "/register", "/forgot-password"];
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
+  const isRoot = pathname === "/";
+  const isCallback = pathname.startsWith("/auth");
+
+  // Skip middleware for special callbacks (e.g., email confirmation)
+  if (isCallback) return supabaseResponse;
+
+  // 1. Reverse Protection: Logged-in users redirected away from login/register
+  if (user && isAuthRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/chat";
+    return NextResponse.redirect(url);
+  }
+
+  // 2. Protected Route System: Users MUST be authenticated for app features
+  if (!user && !isAuthRoute && !isRoot) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    // Store intended destination to redirect back after sign-in
+    url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
   }
 
