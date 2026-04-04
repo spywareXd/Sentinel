@@ -7,7 +7,7 @@ import ActivityHeader from "@/components/activity/ActivityHeader";
 import ActivityList from "@/components/activity/ActivityList";
 import ActivitySummaryStrip from "@/components/activity/ActivitySummaryStrip";
 import Sidebar from "@/components/layout/Sidebar";
-import { getPunishmentExpiry, isActivePunishment } from "@/lib/punishment";
+import { getPunishmentExpiry, isActivePunishment } from "@/utils/punishment";
 import type { ActivityRecord } from "@/types/activity";
 import type { UserPunishment } from "@/types/database/userPunishment";
 import { createClient } from "@/utils/supabase/client";

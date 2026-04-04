@@ -1,7 +1,7 @@
 "use client";
 
 import { ShieldAlert } from "lucide-react";
-import { getPunishmentExpiry } from "@/lib/punishment";
+import { getPunishmentExpiry } from "@/utils/punishment";
 import type { UserPunishment } from "@/types/database/userPunishment";
 
 type PunishmentPopoutProps = {

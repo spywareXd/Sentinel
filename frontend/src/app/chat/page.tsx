@@ -8,7 +8,7 @@ import PunishmentPopout from "@/components/chat/PunishmentPopout";
 import RightRail from "@/components/layout/RightRail";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
-import { getPunishmentExpiry, isActivePunishment } from "@/lib/punishment";
+import { getPunishmentExpiry, isActivePunishment } from "@/utils/punishment";
 import { roomDetails } from "@/mockdata/room";
 import type { UserPunishment } from "@/types/database/userPunishment";
 import type { Message } from "@/types/mockdata/chat";
