@@ -40,14 +40,13 @@ const iconMap = {
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, isLoading: isAuthLoading, signOut } = useAuth();
-  const supabase = createClient();
-  const [userName, setUserName] = useState<string>("Sentinel");
-  const [userInitials, setUserInitials] = useState<string>("S");
+  const [supabase] = useState(() => createClient());
+  const [userName, setUserName] = useState<string>("Loading...");
+  const [userInitials, setUserInitials] = useState<string>("...");
 
   useEffect(() => {
     const fetchProfile = async () => {
       if (user) {
-        console.log("Fetching profile for user:", user.id);
         const { data: profile, error } = await supabase
           .from("profiles")
           .select("username")
@@ -58,8 +57,15 @@ export default function Sidebar() {
           console.error("Error fetching profile:", error);
         }
 
-        const name = profile?.username || user.email?.split('@')[0] || "Sentinel";
-        console.log("Setting user name to:", name);
+        const metadataName =
+          typeof user.user_metadata?.username === "string"
+            ? user.user_metadata.username
+            : null;
+        const name =
+          profile?.username ||
+          metadataName ||
+          user.email?.split("@")[0] ||
+          "Sentinel";
         setUserName(name);
         setUserInitials(name.substring(0, 1).toUpperCase());
       }

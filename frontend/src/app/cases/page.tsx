@@ -219,7 +219,11 @@ export default function CasesPage() {
         .eq("id", user.id)
         .single();
 
-      const walletAddress = profile?.wallet_address?.toLowerCase();
+      const metadataWallet =
+        typeof user.user_metadata?.wallet_address === "string"
+          ? user.user_metadata.wallet_address
+          : null;
+      const walletAddress = (profile?.wallet_address || metadataWallet || "").toLowerCase();
       setModeratorWallet(walletAddress ?? "");
 
       if (!walletAddress) {
@@ -232,7 +236,7 @@ export default function CasesPage() {
       const { data, error } = await supabase
         .from("moderation_cases")
         .select(
-          "*, messages:message_id(content, harmful_score, severe_score, reason), offender:offender_id(username, wallet_address, warnings)"
+          "*, messages:message_id(content), offender:offender_id(username, wallet_address)"
         )
         .or(
           `moderator_1.eq.${walletAddress},moderator_2.eq.${walletAddress},moderator_3.eq.${walletAddress}`
