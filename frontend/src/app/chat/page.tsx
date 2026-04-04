@@ -29,6 +29,7 @@ export default function Home() {
   const [participants, setParticipants] = useState<RoomMember[]>([]);
   const [activePunishment, setActivePunishment] = useState<UserPunishment | null>(null);
   const [acknowledgedPunishmentId, setAcknowledgedPunishmentId] = useState<string | null>(null);
+  const [countdownNowMs, setCountdownNowMs] = useState<number>(() => Date.now());
 
   const punishmentBanner = activePunishment
     ? `${activePunishment.punishment_type.replace(/[_-]+/g, " ")}${
@@ -42,6 +43,27 @@ export default function Home() {
     );
   const shouldShowPunishmentPopout =
     activePunishment !== null && acknowledgedPunishmentId !== activePunishment.id;
+  const timeoutReason = activePunishment?.reason?.trim() || "No reason was provided.";
+  const timeoutCountdown = useMemo(() => {
+    if (!activePunishment) return null;
+
+    const expiresAt = getPunishmentExpiry(activePunishment);
+    if (!expiresAt) return null;
+
+    const remainingMs = expiresAt.getTime() - countdownNowMs;
+    if (remainingMs <= 0) return "00:00";
+
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const hh = String(hours).padStart(2, "0");
+    const mm = String(minutes).padStart(2, "0");
+    const ss = String(seconds).padStart(2, "0");
+
+    return hours > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
+  }, [activePunishment, countdownNowMs]);
 
   // 1. Get the logged-in user's session and profile on mount
   useEffect(() => {
@@ -167,6 +189,19 @@ export default function Home() {
     }, Math.max(0, expiresAt.getTime() - Date.now()) + 250);
 
     return () => window.clearTimeout(timeout);
+  }, [activePunishment]);
+
+  useEffect(() => {
+    if (!activePunishment) return;
+
+    const expiresAt = getPunishmentExpiry(activePunishment);
+    if (!expiresAt) return;
+
+    const interval = window.setInterval(() => {
+      setCountdownNowMs(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
   }, [activePunishment]);
 
   // 2. Fetch historical messages + listen for realtime inserts
@@ -358,11 +393,16 @@ export default function Home() {
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col">
             {punishmentBanner && (
-              <div className="mx-6 mt-4 rounded-2xl border border-[color:color-mix(in_srgb,var(--error)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--error)_12%,var(--surface-container-low))] px-4 py-3 text-sm text-[#ffcdc7] shadow-[0_10px_30px_rgba(127,29,29,0.12)]">
-                <span className="font-bold uppercase tracking-[0.18em] text-[10px] text-[#ffb4ab]">
-                  Punishment Active
+              <div className="relative mx-6 mt-4 rounded-2xl border border-[rgba(255,124,124,0.42)] bg-[rgba(255,82,82,0.05)] pl-5 py-3 pr-28 text-sm text-[#ffcdc7] shadow-[0_10px_24px_rgba(255,72,72,0.12)] backdrop-blur-lg backdrop-saturate-200 backdrop-brightness-125">
+                <span className="font-bold uppercase tracking-[0.18em] text-[12px] text-[#ffb4ab]">
+                  Timeout Active
                 </span>
-                <p className="mt-1 leading-6">{punishmentBanner}</p>
+                <p className="mt-1 leading-6">{timeoutReason}</p>
+                {timeoutCountdown && (
+                  <p className="absolute right-4 top-1/2 -translate-y-1/2 text-base font-semibold tracking-[0.08em] text-[#ffb4ab]">
+                    {timeoutCountdown}
+                  </p>
+                )}
               </div>
             )}
             <ChatFeed
@@ -375,7 +415,7 @@ export default function Home() {
               disabled={blocksMessaging}
               disabledReason={
                 blocksMessaging
-                  ? punishmentBanner ?? "Messaging is temporarily disabled."
+                  ? timeoutReason
                   : null
               }
             />
