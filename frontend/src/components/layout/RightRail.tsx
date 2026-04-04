@@ -1,10 +1,17 @@
 "use client";
 
-import { roomDetails, roomMembers } from "@/mockdata/room";
-import PreviousCasesPanel from "@/components/layout/right-rail/PreviousCasesPanel";
 import ProfileLogo from "@/components/ui/ProfileLogo";
+import type { RoomDetails, RoomMember } from "@/types/mockdata/room";
 
-export default function RightRail() {
+type RightRailProps = {
+  roomDetails: RoomDetails;
+  roomMembers: RoomMember[];
+};
+
+export default function RightRail({
+  roomDetails,
+  roomMembers,
+}: RightRailProps) {
   return (
     <aside className="flex w-72 shrink-0 min-h-0 flex-col overflow-hidden bg-[var(--surface-container-low)]">
       <div id="room-details-top" className="shrink-0 px-6 py-5">
@@ -64,8 +71,6 @@ export default function RightRail() {
             ))}
           </div>
         </div>
-
-        <PreviousCasesPanel />
       </div>
     </aside>
   );

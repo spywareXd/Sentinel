@@ -58,6 +58,16 @@ CONTRACT_ABI = [
         "type": "function"
     },
     {
+        "inputs": [
+            {"internalType": "uint256", "name": "_caseId", "type": "uint256"},
+            {"internalType": "uint8", "name": "_vote", "type": "uint8"}
+        ],
+        "name": "castVote",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
         "anonymous": False,
         "inputs": [
             {"indexed": True, "internalType": "uint256", "name": "caseId", "type": "uint256"},
@@ -75,6 +85,16 @@ CONTRACT_ABI = [
             {"indexed": False, "internalType": "uint8", "name": "decision", "type": "uint8"}
         ],
         "name": "CaseResolved",
+        "type": "event"
+    },
+    {
+        "anonymous": False,
+        "inputs": [
+            {"indexed": True, "internalType": "uint256", "name": "caseId", "type": "uint256"},
+            {"indexed": True, "internalType": "address", "name": "moderator", "type": "address"},
+            {"indexed": False, "internalType": "uint8", "name": "vote", "type": "uint8"}
+        ],
+        "name": "VoteCast",
         "type": "event"
     }
 ]
@@ -203,3 +223,20 @@ def check_resolved_cases(from_block: int = None) -> list:
     except Exception as e:
         print(f"Error checking resolved cases: {e}")
         return []
+
+
+def verify_vote_on_chain(case_id: int, moderator_address: str) -> dict:
+    """
+    Verify that a moderator has voted on a case on-chain.
+    Uses getVote() which returns 0 = not voted, 1 = punish, 2 = dismiss.
+    """
+    try:
+        moderator = Web3.to_checksum_address(moderator_address)
+        vote_value = contract.functions.getVote(case_id, moderator).call()
+        return {
+            "has_voted": vote_value > 0,
+            "vote": vote_value,  # 0=not voted, 1=punish, 2=dismiss
+        }
+    except Exception as e:
+        print(f"Error verifying vote for case {case_id}, moderator {moderator_address}: {e}")
+        return {"has_voted": False, "vote": 0, "error": str(e)}

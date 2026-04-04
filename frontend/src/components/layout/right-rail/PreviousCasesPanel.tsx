@@ -31,7 +31,7 @@ export default function PreviousCasesPanel() {
               {previousCase.title}
             </p>
             <p className="mt-1 text-[10px] text-[var(--on-surface-variant)]">
-              {previousCase.subtitle}
+              {previousCase.aiReason}
             </p>
           </button>
         ))}

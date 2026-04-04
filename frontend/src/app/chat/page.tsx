@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ChatFeed from "@/components/chat/ChatFeed";
 import Composer from "@/components/chat/Composer";
 import RightRail from "@/components/layout/RightRail";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
+import { roomDetails } from "@/mockdata/room";
 import type { Message } from "@/types/mockdata/chat";
+import type { RoomMember } from "@/types/mockdata/room";
 import { createClient } from "@/utils/supabase/client";
 
 export default function Home() {
@@ -21,6 +23,7 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("You");
   const [walletAddress, setWalletAddress] = useState<string>("");
+  const [participants, setParticipants] = useState<RoomMember[]>([]);
 
   // 1. Get the logged-in user's session and profile on mount
   useEffect(() => {
@@ -46,10 +49,30 @@ export default function Home() {
         setUsername(profile.username || user.email || "You");
         setWalletAddress(profile.wallet_address || "");
       }
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .order("username", { ascending: true });
+
+      if (profiles) {
+        setParticipants(
+          profiles.map((profileItem: any) => {
+            const displayName = profileItem.username || "Unknown";
+
+            return {
+              name: displayName,
+              initials: displayName.slice(0, 1).toUpperCase(),
+              role: profileItem.id === user.id ? "Online" : "Participant",
+              status: profileItem.id === user.id ? "online" : "offline",
+            };
+          }),
+        );
+      }
     };
 
     getUser();
-  }, []);
+  }, [router, supabase]);
 
   // 2. Fetch historical messages + listen for realtime inserts
   useEffect(() => {
@@ -141,7 +164,7 @@ export default function Home() {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [userId]);
+  }, [supabase, userId]);
 
   const filteredMessages = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -217,7 +240,7 @@ export default function Home() {
             />
             <Composer onSend={handleSend} />
           </div>
-          <RightRail />
+          <RightRail roomDetails={roomDetails} roomMembers={participants} />
         </div>
       </main>
     </div>

@@ -26,4 +26,5 @@ export type CaseRecord = {
   voteBreakdown: string;
   outcome: string;
   chainRef: string;
+  blockchainCaseId: number | null;
 };

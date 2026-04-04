@@ -8,14 +8,14 @@ import type { CaseRecord } from "@/types/mockdata/cases";
 
 type CaseDetailPanelProps = {
   caseItem: CaseRecord;
-  onDismiss: () => void;
-  onPunish: () => void;
+  moderatorAddress: string;
+  onVoteSuccess: (decision: "Punished" | "Dismissed") => void;
 };
 
 export default function CaseDetailPanel({
   caseItem,
-  onDismiss,
-  onPunish,
+  moderatorAddress,
+  onVoteSuccess,
 }: CaseDetailPanelProps) {
   return (
     <aside
@@ -34,8 +34,10 @@ export default function CaseDetailPanel({
       <CaseActions
         isResolved={caseItem.status === "Resolved"}
         decision={caseItem.decision}
-        onDismiss={onDismiss}
-        onPunish={onPunish}
+        blockchainCaseId={caseItem.blockchainCaseId}
+        supabaseCaseId={caseItem.id}
+        moderatorAddress={moderatorAddress}
+        onVoteSuccess={onVoteSuccess}
       />
     </aside>
   );
