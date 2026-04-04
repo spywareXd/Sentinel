@@ -55,11 +55,12 @@ async def scan_unprocessed():
                 "harmful_score": result["harmful_score"],
                 "severe_score": result["severe_score"],
                 "punishment": result["punishment"],
+                "punishment_duration": result["punishment_duration"],
                 "processed_at": datetime.now(IST).isoformat()
             }).eq("id", msg["id"]).execute()
             
             status = "FLAGGED" if result["flagged"] else "SAFE"
-            print(f"   {status} | Score: {result['harmful_score']:.2f} | Punishment: {result.get('punishment', 'none')}")
+            print(f"   {status} | Score: {result['harmful_score']:.2f} | Punishment: {result['punishment']} ({result['punishment_duration']} min)")
             
             # ===== NEW: Create moderation case if flagged =====
             if result["flagged"] and msg.get("user_id"):
@@ -78,7 +79,7 @@ async def scan_unprocessed():
                         message_id=msg["id"],
                         user_id=msg["user_id"],
                         content=msg["content"],
-                        harmful_score=result["harmful_score"]
+                        severe_score=result["severe_score"]
                     )
                     
                     if case_result["success"]:

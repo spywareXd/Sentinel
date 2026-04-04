@@ -148,13 +148,13 @@ def retry_blockchain_case(case_id: str):
     if case.get("blockchain_case_id") is not None:
         raise HTTPException(status_code=400, detail="Case already has blockchain ID")
     
-    from backend.services.dao_moderation import create_moderation_case
+    from services.moderation import create_moderation_case
     
     result = create_moderation_case(
         message_id=case["message_id"],
         user_id=case["offender_id"],
         content=case["messages"]["content"] if case.get("messages") else "",
-        harmful_score=case.get("toxicity_score", 0)
+        severe_score=case.get("toxicity_score", 0)
     )
     
     return {"success": result["success"], "result": result}

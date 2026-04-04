@@ -18,8 +18,14 @@ load_dotenv()
 MAX_ITERATIONS = 5  
 MODEL = "gemini-flash-latest"
 
+# Punishment Durations (in minutes)
+DURATION_EXTREME = 43200  # 30 days for death threats/extreme toxicity
+DURATION_HIGH = 60        # 1 hour for racism/self-harm
+DURATION_MEDIUM = 10      # 10 minutes for directed insults
+DURATION_LOW = 0          # No punishment for undirected cussing
+
 # System prompt for the moderation agent
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT = f"""
 You are a highly sophisticated AI Moderation Specialist for Chat Toxicity Moderation.
 Your task is to analyze a message and its conversation history to determine if it violates community guidelines such as slurs, threats, harassment, self-harm.
 
@@ -33,18 +39,26 @@ STRICT RULES YOU MUST FOLLOW:
 7. YOUR FINAL OUTPUT MUST BE ONLY THE JSON OBJECT. NO PREAMBLE. NO EXPLANATION.
 
 JSON STRUCTURE:
-{
+{{
   "flagged": true/false,
   "reason": "Detailed reason for flagging or 'Safe' if not flagged in 1-2 sentences",
   "confidence": 0.0 to 1.0,
-  "threat_level": "None" | "Low" | "Medium" | "High",
-  "action_recommended": "none" | "warning" | "timeout" | "ban"
-}
+  "threat_level": "None" | "Low" | "Medium" | "High" | "Extreme",
+  "action_recommended": "none" | "warning" | "timeout" | "ban",
+  "punishment_duration": integer (in minutes)
+}}
 
-GUIDELINES:
-- **Toxicity**: Insults, aggression, hate speech, racism, sexism, homophobia, etc.
-- **Threats**: Direct physical harm, intimidation, blackmail.
-- **Self-Harm**: Encouraging someone to harm themselves.
+SEVERITY & PUNISHMENT GUIDELINES:
+- **Extreme**: Death threats, immediate physical harm, or instructions for self-harm. 
+  - Action: `ban` | Duration: {DURATION_EXTREME} min
+- **High**: Racism, hate speech, slurs, or severe targeted harassment. 
+  - Action: `timeout` | Duration: {DURATION_HIGH} min
+- **Medium**: Directed insults or personal attacks. 
+  - Action: `timeout` | Duration: {DURATION_MEDIUM} min
+- **Low**: Undirected cuss words or general toxicity. 
+  - Action: `none` | Duration: {DURATION_LOW} min
+- **None**: Safe content. 
+  - Action: `none` | Duration: 0
 """
 
 def extract_json(text: str) -> str:

@@ -48,7 +48,7 @@ def select_random_moderators(exclude_user_id: str = None, count: int = 3) -> lis
         return []
 
 
-def create_moderation_case(message_id: str, user_id: str, content: str, harmful_score: float) -> dict:
+def create_moderation_case(message_id: str, user_id: str, content: str, severe_score: float) -> dict:
     """
     Full flow:
     1. Select 3 random moderators
@@ -101,7 +101,7 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
                 "moderator_2": mod_wallets[1],
                 "moderator_3": mod_wallets[2],
                 "status": "insufficient_moderators",
-                "toxicity_score": harmful_score,
+                "toxicity_score": severe_score,
                 "created_at": datetime.now(IST).isoformat()
             }
             
@@ -127,7 +127,7 @@ def create_moderation_case(message_id: str, user_id: str, content: str, harmful_
             "moderator_2": mod_wallets[1],
             "moderator_3": mod_wallets[2],
             "status": "voting",
-            "toxicity_score": harmful_score,
+            "toxicity_score": severe_score,
             "created_at": datetime.now(IST).isoformat()
         }
         
