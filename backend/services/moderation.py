@@ -149,23 +149,35 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
         
         if chain_result["success"]:
             blockchain_case_id = chain_result["case_id"]
+            tx_hash = chain_result["tx_hash"]
             
-            # Update Supabase case with blockchain case ID
-            supabase.table("moderation_cases").update({
-                "blockchain_case_id": blockchain_case_id,
-                "status": "voting"
-            }).eq("id", supabase_case_id).execute()
-            
-            print("Moderation case fully created.")
-            print(f"   Supabase ID: {supabase_case_id}")
-            print(f"   Blockchain Case ID: {blockchain_case_id}")
-            print(f"   TX: {chain_result['tx_hash']}")
+            print(f"Case {blockchain_case_id} created on-chain. TX: {tx_hash}")
+
+            # --- CRITICAL: Save blockchain_case_id and set status to voting ---
+            # This is essential for the case to be votable in the frontend.
+            try:
+                # First attempt: Try to save EVERYTHING (including tx_hash if column exists)
+                supabase.table("moderation_cases").update({
+                    "blockchain_case_id": blockchain_case_id,
+                    "tx_hash": tx_hash,
+                    "status": "voting"
+                }).eq("id", supabase_case_id).execute()
+                print("   Saved case ID and transaction hash to DB.")
+            except Exception as e:
+                # Second attempt fallback: If tx_hash column is missing, just save case_id
+                print(f"   Warning: Could not save tx_hash (col might be missing: {e})")
+                print("   Falling back to basic case registration...")
+                supabase.table("moderation_cases").update({
+                    "blockchain_case_id": blockchain_case_id,
+                    "status": "voting"
+                }).eq("id", supabase_case_id).execute()
+                print("   Basic case registration successful. Voting is now ENABLED.")
             
             return {
                 "success": True,
                 "supabase_case_id": supabase_case_id,
                 "blockchain_case_id": blockchain_case_id,
-                "tx_hash": chain_result["tx_hash"],
+                "tx_hash": tx_hash,
                 "moderators": mod_wallets
             }
         else:
