@@ -134,7 +134,7 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
             "created_at": datetime.now(IST).isoformat()
         }
         
-        print(f"Creating case in DB with toxicity_score: {final_score}")
+        print(f"Creating case in DB with toxicity_score: {severe_score}")
         
         insert_resp = supabase.table("moderation_cases").insert(case_data).execute()
         
@@ -208,38 +208,60 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
 
 def check_and_update_resolved_cases():
     """
-    Poll blockchain for resolved cases and update Supabase.
-    Called periodically by the scanner loop.
+    Poll blockchain for resolved cases OR 2/3 majority consensus.
+    Updates Supabase to trigger automated punishments.
     """
     try:
         # Get all cases that are still 'voting' in Supabase
         resp = supabase.table("moderation_cases") \
-            .select("id, blockchain_case_id") \
+            .select("id, blockchain_case_id, moderator_1, moderator_2, moderator_3") \
             .eq("status", "voting") \
             .not_.is_("blockchain_case_id", "null") \
             .execute()
         
         pending_cases = resp.data or []
-        
         if not pending_cases:
             return
         
-        from services.blockchain import get_case_from_chain
+        from services.blockchain import get_case_from_chain, verify_vote_on_chain
         
         for case in pending_cases:
-            chain_data = get_case_from_chain(case["blockchain_case_id"])
-            
-            if chain_data and chain_data["resolved"]:
-                decision = "punish" if chain_data["decision"] == 1 else "dismiss"
+            try:
+                bc_id = case["blockchain_case_id"]
+                chain_data = get_case_from_chain(bc_id)
+                if not chain_data:
+                    continue
+
+                # --- OPTION A: Blockchain is already officially resolved ---
+                if chain_data["resolved"]:
+                    decision = "punish" if chain_data["decision"] == 1 else "dismiss"
+                    print(f"[SYNC] Case {bc_id} officially resolved on-chain: {decision}")
+                    supabase.table("moderation_cases").update({"status": "resolved", "decision": decision}).eq("id", case["id"]).execute()
+                    continue
+
+                # --- OPTION B: Pro-active 2/3 Majority Check ---
+                mods = [case["moderator_1"], case["moderator_2"], case["moderator_3"]]
+                votes = {"punish": 0, "dismiss": 0}
                 
-                supabase.table("moderation_cases").update({
-                    "status": "resolved",
-                    "decision": decision
-                }).eq("id", case["id"]).execute()
-                
-                print(f"Case {case['blockchain_case_id']} resolved: {decision.upper()}")
-                # Note: Warnings and Punishment records are now handled by the 
-                # Supabase PostgreSQL trigger for atomicity and consistency.
+                for mod_addr in mods:
+                    if not mod_addr: continue
+                    v_check = verify_vote_on_chain(bc_id, mod_addr)
+                    if v_check["vote"] == 1: votes["punish"] += 1
+                    elif v_check["vote"] == 2: votes["dismiss"] += 1
+
+                determined_decision = None
+                if votes["punish"] >= 2: determined_decision = "punish"
+                elif votes["dismiss"] >= 2: determined_decision = "dismiss"
+
+                if determined_decision:
+                    print(f"[SYNC] Case {bc_id} reached 2/3 majority pro-actively: {determined_decision}")
+                    supabase.table("moderation_cases").update({
+                        "status": "resolved",
+                        "decision": determined_decision
+                    }).eq("id", case["id"]).execute()
+            except Exception as case_error:
+                print(f"   [SYNC Error] Skipping Case {case.get('blockchain_case_id', 'unknown')}: {case_error}")
+                continue
                 
     except Exception as e:
-        print(f"Error checking resolved cases: {e}")
+        print(f"CRITICAL Error in background resolution sync loop: {e}")

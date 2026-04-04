@@ -10,6 +10,8 @@ import Sidebar from "@/components/layout/Sidebar";
 import type { CaseDecision, CaseRecord } from "@/types/mockdata/cases";
 import { createClient } from "@/utils/supabase/client";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+
 type TopTab = "Assigned" | "History";
 
 const toTitleCase = (value: string) =>
@@ -233,25 +235,21 @@ export default function CasesPage() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("moderation_cases")
-        .select(
-          "*, messages:message_id(content), offender:offender_id(username, wallet_address, warnings)"
-        )
-        .or(
-          `moderator_1.eq.${walletAddress},moderator_2.eq.${walletAddress},moderator_3.eq.${walletAddress}`
-        )
-        .order("created_at", { ascending: false });
+      const resp = await fetch(
+        `${BACKEND_URL}/moderation/my-cases?wallet_address=${encodeURIComponent(walletAddress)}`,
+        { cache: "no-store" }
+      );
 
-      if (error) {
-        console.error("Error loading cases:", error);
+      if (!resp.ok) {
+        console.error("Error loading cases:", await resp.text().catch(() => "Unknown backend error"));
         setCases([]);
         setSelectedCaseId(null);
         setIsLoading(false);
         return;
       }
 
-      const mappedCases = (data ?? []).map(mapCaseRecord);
+      const payload = (await resp.json()) as { cases?: DbCase[] };
+      const mappedCases = (payload.cases ?? []).map(mapCaseRecord);
       setCases(mappedCases);
       setIsLoading(false);
     };
@@ -374,7 +372,10 @@ export default function CasesPage() {
                 <CaseDetailPanel
                   caseItem={selectedCase}
                   moderatorAddress={moderatorWallet}
-                  onVoteSuccess={(decision) => resolveCase(selectedCase.id, decision)}
+                  onVoteSuccess={(decision) => {
+                    resolveCase(selectedCase.id, decision);
+                    setRefreshKey((currentKey) => currentKey + 1);
+                  }}
                 />
               </div>
             ) : (

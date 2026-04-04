@@ -15,6 +15,104 @@ class VoteSyncRequest(BaseModel):
     tx_hash: str           # transaction hash from MetaMask
 
 
+def _vote_label(vote: int) -> str:
+    if vote == 1:
+        return "punish"
+    if vote == 2:
+        return "dismiss"
+    return "pending"
+
+
+def _log_vote_event(case: dict, chain_case: dict | None, source: str, moderator_address: str | None = None, vote: int | None = None):
+    """
+    Emit a readable vote event log with the current moderator breakdown.
+    """
+    blockchain_case_id = case.get("blockchain_case_id")
+    moderators = [case.get("moderator_1"), case.get("moderator_2"), case.get("moderator_3")]
+    punish_count = 0
+    dismiss_count = 0
+    breakdown: list[str] = []
+
+    if blockchain_case_id is not None:
+        for moderator in moderators:
+            if not moderator:
+                continue
+            vote_value = verify_vote_on_chain(blockchain_case_id, moderator).get("vote", 0)
+            if vote_value == 1:
+                punish_count += 1
+            elif vote_value == 2:
+                dismiss_count += 1
+            breakdown.append(f"{moderator[:10]}...={_vote_label(vote_value)}")
+
+    parts = [f"[VOTE EVENT] {source}", f"case={blockchain_case_id}"]
+    if moderator_address:
+        parts.append(f"moderator={moderator_address[:10]}...")
+    if vote is not None:
+        parts.append(f"vote={_vote_label(vote)}")
+    if chain_case and chain_case.get("vote_count") is not None:
+        parts.append(f"vote_count={chain_case['vote_count']}/3")
+
+    print(" | ".join(parts))
+    print(
+        f"   punish={punish_count} | dismiss={dismiss_count} | "
+        f"resolved={chain_case.get('resolved') if chain_case else '?'} | "
+        f"decision={_vote_label(chain_case.get('decision', 0)) if chain_case else 'unknown'}"
+    )
+    if breakdown:
+        print(f"   breakdown: {', '.join(breakdown)}")
+
+
+def _sync_case_resolution(case: dict) -> tuple[dict, dict | None]:
+    """
+    Sync a moderation case with on-chain votes.
+    Resolves at 3/3 on-chain contract resolution or pro-actively at 2/3 majority.
+    Returns the possibly-updated case and the fetched chain data.
+    """
+    blockchain_case_id = case.get("blockchain_case_id")
+    if blockchain_case_id is None:
+        return case, None
+
+    chain_data = get_case_from_chain(blockchain_case_id)
+    if not chain_data or case.get("status") != "voting":
+        return case, chain_data
+
+    determined_decision = None
+
+    if chain_data.get("resolved"):
+        determined_decision = "punish" if chain_data.get("decision") == 1 else "dismiss"
+    else:
+        mods = [case.get("moderator_1"), case.get("moderator_2"), case.get("moderator_3")]
+        v_punish = 0
+        v_dismiss = 0
+
+        for moderator in mods:
+            if not moderator:
+                continue
+            vote = verify_vote_on_chain(blockchain_case_id, moderator).get("vote", 0)
+            if vote == 1:
+                v_punish += 1
+            elif vote == 2:
+                v_dismiss += 1
+
+        if v_punish >= 2:
+            determined_decision = "punish"
+        elif v_dismiss >= 2:
+            determined_decision = "dismiss"
+
+    if determined_decision:
+        supabase.table("moderation_cases").update({
+            "status": "resolved",
+            "decision": determined_decision
+        }).eq("id", case["id"]).execute()
+        case = {
+            **case,
+            "status": "resolved",
+            "decision": determined_decision
+        }
+
+    return case, chain_data
+
+
 @router.post("/vote/sync")
 def sync_vote(body: VoteSyncRequest):
     """
@@ -23,16 +121,22 @@ def sync_vote(body: VoteSyncRequest):
     If 2+ votes agree (majority), marks the case resolved.
     """
     # Fetch the case
-    resp = supabase.table("moderation_cases") \
-        .select("*") \
-        .eq("id", body.case_id) \
-        .single() \
-        .execute()
-
+    resp = supabase.table("moderation_cases").select("*").eq("id", body.case_id).single().execute()
     if not resp.data:
         raise HTTPException(status_code=404, detail="Case not found")
-
     case = resp.data
+    print(
+        f"[VOTE SYNC] case_id={body.case_id} | "
+        f"blockchain_case_id={case.get('blockchain_case_id')} | "
+        f"moderator={body.moderator_address[:10]}... | "
+        f"vote={_vote_label(body.vote)} | tx={body.tx_hash}"
+    )
+
+    # First sync from chain in case this vote completed consensus.
+    case, chain_case = _sync_case_resolution(case)
+    if case.get("status") == "resolved":
+        _log_vote_event(case, chain_case, "post-sync resolved", body.moderator_address, body.vote)
+        return {"success": True, "case_resolved": True, "decision": case.get("decision")}
 
     if case.get("status") == "resolved":
         raise HTTPException(status_code=400, detail="Case already resolved")
@@ -51,6 +155,7 @@ def sync_vote(body: VoteSyncRequest):
 
     # Check current on-chain case state
     chain_case = get_case_from_chain(blockchain_case_id)
+    _log_vote_event(case, chain_case, "vote recorded", body.moderator_address, body.vote)
 
     if chain_case and chain_case.get("resolved"):
         # Contract resolved the case — determine outcome
@@ -112,13 +217,10 @@ def get_my_cases(wallet_address: str = Query(..., description="Moderator wallet 
     
     cases = resp.data or []
     
-    # Enrich with on-chain data
+    # Sync/enrich with on-chain data
     enriched = []
     for case in cases:
-        chain_data = None
-        if case.get("blockchain_case_id") is not None:
-            chain_data = get_case_from_chain(case["blockchain_case_id"])
-        
+        case, chain_data = _sync_case_resolution(case)
         enriched.append({
             **case,
             "on_chain": chain_data
@@ -133,29 +235,12 @@ def get_my_cases(wallet_address: str = Query(..., description="Moderator wallet 
 
 @router.get("/case/{case_id}")
 def get_case_detail(case_id: str):
-    """Get full details of a specific moderation case"""
-    resp = supabase.table("moderation_cases") \
-        .select("*, messages:message_id(content, harmful_score, severe_score, reason, punishment), offender:offender_id(username, wallet_address, warnings)") \
-        .eq("id", case_id) \
-        .single() \
-        .execute()
-    
-    if not resp.data:
-        raise HTTPException(status_code=404, detail="Case not found")
-    
+    """Get full details and ensure status is synced with blockchain"""
+    resp = supabase.table("moderation_cases").select("*, messages:message_id(content, harmful_score, severe_score, reason, punishment), offender:offender_id(username, wallet_address, warnings)").eq("id", case_id).single().execute()
+    if not resp.data: raise HTTPException(status_code=404, detail="Case not found")
     case = resp.data
-    chain_data = None
-    
-    if case.get("blockchain_case_id") is not None:
-        chain_data = get_case_from_chain(case["blockchain_case_id"])
-    
-    return {
-        "success": True,
-        "case": {
-            **case,
-            "on_chain": chain_data
-        }
-    }
+    case, chain_data = _sync_case_resolution(case)
+    return {"success": True, "case": {**case, "on_chain": chain_data}}
 
 
 @router.get("/chain/case/{blockchain_case_id}")

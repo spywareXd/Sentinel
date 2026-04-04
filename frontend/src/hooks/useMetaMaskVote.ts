@@ -169,8 +169,13 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
 
       if (!syncResp.ok) {
         const data = await syncResp.json().catch(() => ({}));
-        // Non-fatal: the vote IS on-chain, backend sync is best-effort
-        console.warn("Backend sync warning:", data);
+        const detail =
+          typeof data?.detail === "string"
+            ? data.detail
+            : typeof data?.error === "string"
+              ? data.error
+              : "Vote was recorded on-chain, but Sentinel could not update moderation_cases.";
+        throw new Error(detail);
       }
 
       setStatus("success");
