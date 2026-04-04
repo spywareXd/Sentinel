@@ -26,6 +26,9 @@ export const caseRecords: CaseRecord[] = [
       "Case is still active. Current consensus leans strongly toward punishment, but quorum has not been fully reached yet.",
     chainRef: "0X82...F2E1",
     blockchainCaseId: null,
+    punishmentType: "ban",
+    punishmentDuration: 43200,
+    txHash: "0x82f0c7a2e1d0b1a0c8b9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7",
   },
   {
     id: "case-9281",
@@ -52,6 +55,9 @@ export const caseRecords: CaseRecord[] = [
       "Still in voting. Current sentiment suggests dismissal unless new context shows targeted harassment.",
     chainRef: "0X42...A911",
     blockchainCaseId: null,
+    punishmentType: "none",
+    punishmentDuration: 0,
+    txHash: "0x42a911a2e1d0b1a0c8b9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7",
   },
   {
     id: "case-9270",
@@ -79,6 +85,9 @@ export const caseRecords: CaseRecord[] = [
       "Case resolved with punishment after jurors reviewed the original message and follow-up replies. The decision remains visible for transparency review.",
     chainRef: "0X91...DD42",
     blockchainCaseId: null,
+    punishmentType: "timeout",
+    punishmentDuration: 60,
+    txHash: "0x91dd42a2e1d0b1a0c8b9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7",
   },
   {
     id: "case-9264",
@@ -105,6 +114,9 @@ export const caseRecords: CaseRecord[] = [
       "Case has just entered jury review. This one requires immediate attention because the language is unambiguous.",
     chainRef: "0X77...C108",
     blockchainCaseId: null,
+    punishmentType: "ban",
+    punishmentDuration: 43200,
+    txHash: "0x82f0c7a2e1d0b1a0c8b9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7",
   },
   {
     id: "case-9258",
@@ -132,5 +144,8 @@ export const caseRecords: CaseRecord[] = [
       "Resolved with dismissal and no account penalty. Message stayed visible but moderators noted the pattern for future spam escalation.",
     chainRef: "0X11...B812",
     blockchainCaseId: null,
+    punishmentType: "warning",
+    punishmentDuration: 0,
+    txHash: "0x11b812a2e1d0b1a0c8b9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7",
   },
 ];

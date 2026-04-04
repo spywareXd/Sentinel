@@ -138,10 +138,10 @@ export default function MetaMaskVoteModal({
                 color: isPunish ? "var(--error)" : "var(--primary)",
               }}
             >
-              {isPunish ? "P" : "D"}
+              {isPunish ? "A" : "D"}
             </span>
             <span className="text-xs font-extrabold uppercase tracking-[0.22em] text-[var(--on-surface-variant)]">
-              {isPunish ? "Vote: Punish" : "Vote: Dismiss"}
+              {isPunish ? "Approve" : "Dismiss"}
             </span>
           </div>
           {(status === "success" || status === "error") && (
