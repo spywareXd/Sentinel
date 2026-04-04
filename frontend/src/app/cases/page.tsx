@@ -326,8 +326,8 @@ export default function CasesPage() {
           }}
         />
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-8 overflow-y-auto p-8">
-          <div className="col-span-12 flex flex-col gap-8 xl:col-span-8">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-8 overflow-hidden p-8">
+          <div className="premium-scrollbar col-span-12 flex min-h-0 flex-col gap-8 overflow-y-auto pr-2 xl:col-span-8">
             <section className="flex flex-col gap-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
@@ -368,9 +368,9 @@ export default function CasesPage() {
             )}
           </div>
 
-          <div className="col-span-12 xl:col-span-4">
+          <div className="col-span-12 min-h-0 xl:col-span-4">
             {selectedCase ? (
-              <div ref={detailPanelRef}>
+              <div ref={detailPanelRef} className="h-full">
                 <CaseDetailPanel
                   caseItem={selectedCase}
                   moderatorAddress={moderatorWallet}
@@ -378,8 +378,10 @@ export default function CasesPage() {
                 />
               </div>
             ) : (
-              <div className="rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
+              <div className="flex h-full items-start">
+                <div className="w-full rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
                 Select a case to inspect its moderation details.
+                </div>
               </div>
             )}
           </div>

@@ -193,7 +193,7 @@ export default function Home() {
           profilesData?.map((p: { id: string; username: string | null }) => [p.id, p.username]) || []
         );
 
-        const formatted: Message[] = messagesData.map((msg: { id: string | number; user_id: string; created_at: string; content: string }) => {
+        const formatted: Message[] = messagesData.map((msg: { id: string | number; user_id: string; created_at: string; content: string; flagged?: boolean | null }) => {
           const msgUsername = profileMap.get(msg.user_id) || "Unknown User";
           return {
             id: String(msg.id),
@@ -204,6 +204,7 @@ export default function Home() {
               minute: "2-digit",
             }),
             text: msg.content,
+            flagged: Boolean(msg.flagged),
             tone: msg.user_id === userId ? "self" : "primary",
           };
         });
@@ -219,7 +220,7 @@ export default function Home() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
-        async (payload: { new: { id: string | number; user_id: string; created_at: string; content: string } }) => {
+        async (payload: { new: { id: string | number; user_id: string; created_at: string; content: string; flagged?: boolean | null } }) => {
           const newMsg = payload.new;
 
           // Skip if we already have this message (from optimistic update)
@@ -245,6 +246,7 @@ export default function Home() {
               minute: "2-digit",
             }),
             text: newMsg.content,
+            flagged: Boolean(newMsg.flagged),
             tone: newMsg.user_id === userId ? "self" : "primary",
           };
 
@@ -253,6 +255,19 @@ export default function Home() {
             return [...prev, formattedNew];
           });
         }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages" },
+        (payload: { new: { id: string | number; flagged?: boolean | null } }) => {
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === String(payload.new.id)
+                ? { ...message, flagged: Boolean(payload.new.flagged) }
+                : message,
+            ),
+          );
+        },
       )
       .subscribe();
 
