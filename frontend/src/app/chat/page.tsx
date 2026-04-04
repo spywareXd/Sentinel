@@ -4,16 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ChatFeed from "@/components/chat/ChatFeed";
 import Composer from "@/components/chat/Composer";
+import PunishmentPopout from "@/components/chat/PunishmentPopout";
 import RightRail from "@/components/layout/RightRail";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
+import { getPunishmentExpiry, isActivePunishment } from "@/lib/punishment";
 import { roomDetails } from "@/mockdata/room";
+import type { UserPunishment } from "@/types/database/userPunishment";
 import type { Message } from "@/types/mockdata/chat";
 import type { RoomMember } from "@/types/mockdata/room";
 import { createClient } from "@/utils/supabase/client";
 
 export default function Home() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -24,6 +27,21 @@ export default function Home() {
   const [username, setUsername] = useState<string>("You");
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [participants, setParticipants] = useState<RoomMember[]>([]);
+  const [activePunishment, setActivePunishment] = useState<UserPunishment | null>(null);
+  const [acknowledgedPunishmentId, setAcknowledgedPunishmentId] = useState<string | null>(null);
+
+  const punishmentBanner = activePunishment
+    ? `${activePunishment.punishment_type.replace(/[_-]+/g, " ")}${
+        activePunishment.reason ? ` • ${activePunishment.reason}` : ""
+      }`
+    : null;
+  const blocksMessaging =
+    activePunishment !== null &&
+    ["timeout", "mute", "ban", "restricted", "suspension", "kick"].includes(
+      activePunishment.punishment_type.toLowerCase(),
+    );
+  const shouldShowPunishmentPopout =
+    activePunishment !== null && acknowledgedPunishmentId !== activePunishment.id;
 
   // 1. Get the logged-in user's session and profile on mount
   useEffect(() => {
@@ -50,6 +68,22 @@ export default function Home() {
         setWalletAddress(profile.wallet_address || "");
       }
 
+      const { data: punishment } = await supabase
+        .from("user_punishments")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .order("issued_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (punishment) {
+        const typedPunishment = punishment as UserPunishment;
+        setActivePunishment(isActivePunishment(typedPunishment) ? typedPunishment : null);
+      } else {
+        setActivePunishment(null);
+      }
+
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, username")
@@ -73,6 +107,67 @@ export default function Home() {
 
     getUser();
   }, [router, supabase]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    let isMounted = true;
+
+    const refreshActivePunishment = async () => {
+      const { data: punishment } = await supabase
+        .from("user_punishments")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("issued_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (!punishment) {
+        setActivePunishment(null);
+        return;
+      }
+
+      const typedPunishment = punishment as UserPunishment;
+      setActivePunishment(isActivePunishment(typedPunishment) ? typedPunishment : null);
+    };
+
+    const channel = supabase
+      .channel(`chat-punishments-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_punishments" },
+        () => {
+          void refreshActivePunishment();
+        },
+      )
+      .subscribe();
+
+    const interval = window.setInterval(() => {
+      void refreshActivePunishment();
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, userId]);
+
+  useEffect(() => {
+    if (!activePunishment) return;
+
+    const expiresAt = getPunishmentExpiry(activePunishment);
+    if (!expiresAt) return;
+
+    const timeout = window.setTimeout(() => {
+      setActivePunishment(null);
+    }, Math.max(0, expiresAt.getTime() - Date.now()) + 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [activePunishment]);
 
   // 2. Fetch historical messages + listen for realtime inserts
   useEffect(() => {
@@ -177,7 +272,7 @@ export default function Home() {
 
   const handleSend = async (text: string) => {
     const trimmedText = text.trim();
-    if (!trimmedText || !userId) return;
+    if (!trimmedText || !userId || blocksMessaging) return;
 
     const { data: insertedMsg, error } = await supabase
       .from("messages")
@@ -225,7 +320,21 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--background)]">
+    <div
+      className={[
+        "flex h-screen overflow-hidden",
+        blocksMessaging
+          ? "bg-[radial-gradient(circle_at_top,rgba(185,28,28,0.12),transparent_35%),var(--background)]"
+          : "bg-[var(--background)]",
+      ].join(" ")}
+    >
+      {shouldShowPunishmentPopout && activePunishment && (
+        <PunishmentPopout
+          punishment={activePunishment}
+          onAcknowledge={() => setAcknowledgedPunishmentId(activePunishment.id)}
+        />
+      )}
+
       <Sidebar />
 
       <main className="flex min-w-0 min-h-0 flex-1 flex-col">
@@ -233,12 +342,28 @@ export default function Home() {
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="flex min-w-0 min-h-0 flex-1 flex-col">
+            {punishmentBanner && (
+              <div className="mx-6 mt-4 rounded-2xl border border-[color:color-mix(in_srgb,var(--error)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--error)_12%,var(--surface-container-low))] px-4 py-3 text-sm text-[#ffcdc7] shadow-[0_10px_30px_rgba(127,29,29,0.12)]">
+                <span className="font-bold uppercase tracking-[0.18em] text-[10px] text-[#ffb4ab]">
+                  Punishment Active
+                </span>
+                <p className="mt-1 leading-6">{punishmentBanner}</p>
+              </div>
+            )}
             <ChatFeed
               messages={filteredMessages}
               onDelete={handleDelete}
               searchQuery={searchQuery}
             />
-            <Composer onSend={handleSend} />
+            <Composer
+              onSend={handleSend}
+              disabled={blocksMessaging}
+              disabledReason={
+                blocksMessaging
+                  ? punishmentBanner ?? "Messaging is temporarily disabled."
+                  : null
+              }
+            />
           </div>
           <RightRail roomDetails={roomDetails} roomMembers={participants} />
         </div>
