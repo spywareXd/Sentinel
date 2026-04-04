@@ -49,12 +49,12 @@ export default function Login() {
 
       <div className="flex flex-col items-center w-full max-w-md z-10 my-10 relative">
         {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
+        <Link href="/" className="flex flex-col items-center mb-8 hover:scale-105 transition-transform">
           <div className="bg-[#a3a5fa] text-[#0a0c14] p-3 rounded-[1.2rem] mb-4 shadow-[0_0_30px_rgba(163,165,250,0.2)]">
             <Shield className="w-8 h-8" strokeWidth={2.5} />
           </div>
           <h1 className="text-xl font-bold tracking-[0.25em] text-on-surface uppercase font-headline">Sentinel</h1>
-        </div>
+        </Link>
 
         {/* Main Card */}
         <div className="w-full bg-surface-container/90 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-white/[0.02]">

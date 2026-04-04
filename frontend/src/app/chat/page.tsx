@@ -8,6 +8,7 @@ import RightRail from "@/components/layout/RightRail";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import { roomDetails } from "@/mockdata/room";
+import { Shield } from "lucide-react";
 import type { Message } from "@/types/mockdata/chat";
 import type { RoomMember } from "@/types/mockdata/room";
 import { createClient } from "@/utils/supabase/client";
@@ -24,6 +25,7 @@ export default function Home() {
   const [username, setUsername] = useState<string>("You");
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [participants, setParticipants] = useState<RoomMember[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // 1. Get the logged-in user's session and profile on mount
   useEffect(() => {
@@ -69,6 +71,8 @@ export default function Home() {
           }),
         );
       }
+
+      setLoading(false);
     };
 
     getUser();
@@ -223,6 +227,41 @@ export default function Home() {
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
     }
   };
+
+  if (loading) {
+    return (
+      <div className="h-screen bg-[#05070a] flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Background Aura */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="relative group perspective">
+          <div className="p-1.5 rounded-[2.5rem] bg-white/[0.03] border border-white/[0.05] shadow-2xl relative">
+            <div className="bg-[#a3a5fa] text-[#0a0c14] p-6 rounded-[2.1rem] shadow-[0_0_50px_rgba(163,165,250,0.3)] animate-pulse">
+              <Shield className="w-16 h-16" strokeWidth={2.5} />
+            </div>
+            {/* Spinning Orbitings */}
+            <div className="absolute inset-[-40px] border border-primary/20 rounded-full scale-110 animate-spin-slow pointer-events-none" />
+            <div className="absolute inset-[-80px] border border-secondary/10 rounded-full scale-125 animate-reverse-spin-slow opacity-30 pointer-events-none" />
+          </div>
+        </div>
+
+        <div className="mt-16 flex flex-col items-center gap-3">
+          <p className="text-on-surface font-headline font-bold tracking-[0.4em] text-xs uppercase text-center ml-1">
+            Establishing Security Handshake
+          </p>
+          <div className="flex gap-1.5 items-center justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" />
+          </div>
+        </div>
+
+        <div className="mt-8 text-[11px] font-bold tracking-widest text-on-surface-variant/40 uppercase">
+          Sentitnel Defense Protocol Active
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)]">

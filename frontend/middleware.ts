@@ -38,21 +38,27 @@ export async function middleware(request: NextRequest) {
   const isRoot = pathname === "/";
   const isCallback = pathname.startsWith("/auth");
 
+  console.log(`Middleware: Processing ${pathname} | User: ${!!user} | isAuthRoute: ${isAuthRoute} | isRoot: ${isRoot}`);
+
   // Skip middleware for special callbacks (e.g., email confirmation)
   if (isCallback) return supabaseResponse;
 
   // 1. Reverse Protection: Logged-in users redirected away from login/register
   if (user && isAuthRoute) {
+    console.log(`Middleware: Redirecting auth'd user from ${pathname} to /chat`);
     const url = request.nextUrl.clone();
     url.pathname = "/chat";
     return NextResponse.redirect(url);
   }
 
-  // 2. Protected Route System: Users MUST be authenticated for app features
-  if (!user && !isAuthRoute && !isRoot) {
+  // 2. Aggressive Protection for Chat and other app routes
+  const protectedPaths = ["/chat", "/profile", "/settings"];
+  const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path));
+
+  if (!user && isProtectedPath) {
+    console.log(`Middleware: INTERCEPTED unauthorized request to ${pathname}. Redirecting to /login.`);
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    // Store intended destination to redirect back after sign-in
     url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
   }

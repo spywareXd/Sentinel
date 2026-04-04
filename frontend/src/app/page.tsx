@@ -14,7 +14,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-on-surface font-body selection:bg-primary-container">
       {/* ── Navbar ── */}
-      <nav className="fixed top-0 w-full z-50 bg-[#020305]/60 backdrop-blur-xl border-b border-white/[0.03]">
+      <nav className="fixed top-0 w-full z-50 bg-[#020305]/40 backdrop-blur-2xl backdrop-saturate-[180%] border-b border-white/[0.05] shadow-2xl">
         <div className="flex justify-between items-center px-8 py-4 max-w-7xl mx-auto">
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2">
@@ -77,12 +77,16 @@ export default function LandingPage() {
           </div>
 
           {/* Shield Emblem */}
-          <div className="relative mb-12 drop-shadow-[0_0_30px_rgba(192,193,255,0.3)] group cursor-pointer hover:scale-105 transition-all duration-700">
-            <div className="w-48 h-48 md:w-64 md:h-64 rounded-[2rem] bg-surface-container-high border border-outline-variant/20 flex items-center justify-center backdrop-blur-xl bg-[rgba(45,52,73,0.4)] rotate-12 group-hover:rotate-[8deg] transition-all duration-700 shadow-2xl">
-              <div className="w-full h-full p-8 flex items-center justify-center -rotate-12 group-hover:-rotate-[8deg] transition-all duration-700">
-                <span 
-                  className="material-symbols-outlined text-8xl md:text-[120px] text-primary group-hover:text-primary-container group-hover:drop-shadow-[0_0_40px_rgba(192,193,255,0.8)] transition-all duration-500" 
-                  style={{ fontVariationSettings: "'FILL' 1" }}
+          <div className="relative mb-12 drop-shadow-[0_0_40px_rgba(163,165,250,0.4)] group cursor-pointer hover:scale-105 transition-all duration-700">
+            <div className="w-56 h-56 md:w-60 md:h-60 rounded-[2.5rem] bg-surface-container-high border border-outline-variant/30 flex items-center justify-center backdrop-blur-xl bg-[rgba(45,52,73,0.4)] rotate-12 group-hover:rotate-[8deg] transition-all duration-700 shadow-2xl relative overflow-visible">
+              <div className="w-full h-full flex items-center justify-center -rotate-12 group-hover:-rotate-[8deg] transition-all duration-700">
+                <span
+                  className="material-symbols-outlined block leading-none select-none text-primary group-hover:text-primary-container group-hover:drop-shadow-[0_0_50px_rgba(163,165,250,0.9)] transition-all duration-500"
+                  style={{
+                    fontVariationSettings: "'FILL' 1",
+                    fontSize: 'clamp(120px, 30vw, 120px)',
+                    lineHeight: '1'
+                  }}
                 >
                   shield_with_heart
                 </span>
