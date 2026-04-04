@@ -13,18 +13,18 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
 
   const connectMetaMask = async () => {
-    // @ts-ignore - ethereum is injected by MetaMask
     if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
       try {
         setIsConnecting(true);
         setError(null);
-        // @ts-ignore
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        if (accounts.length > 0) {
+        const accounts = (await window.ethereum.request({
+          method: "eth_requestAccounts",
+        })) as string[];
+        if (accounts && accounts.length > 0) {
           setWalletAddress(accounts[0]);
         }
-      } catch (err: any) {
-        if (err.code === 4001) {
+      } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'code' in err && err.code === 4001) {
           setError('Connection request was rejected.');
         } else {
           setError('Failed to connect to MetaMask.');
@@ -177,7 +177,7 @@ export default function Register() {
 
           {/* Terms text */}
           <div className="mt-6 text-[11px] text-center text-on-surface-variant/60 px-2 leading-relaxed">
-            By connecting and registering, you agree to Sentinel's <a href="#" className="font-semibold text-primary/80 hover:text-primary transition-colors">Terms of Service</a> and <a href="#" className="font-semibold text-primary/80 hover:text-primary transition-colors">Privacy Policy</a>.
+            By connecting and registering, you agree to Sentinel&apos;s <a href="#" className="font-semibold text-primary/80 hover:text-primary transition-colors">Terms of Service</a> and <a href="#" className="font-semibold text-primary/80 hover:text-primary transition-colors">Privacy Policy</a>.
           </div>
 
           <div className="mt-8 pt-6 border-t border-outline-variant/20 text-center text-sm">

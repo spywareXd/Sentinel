@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BrowserProvider, Contract, parseUnits } from "ethers";
+import { BrowserProvider, Contract } from "ethers";
 
 // Minimal ABI — only the castVote function
 const SENTINEL_ABI = [
@@ -105,9 +105,9 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
             method: "wallet_switchEthereumChain",
             params: [{ chainId: SEPOLIA_CHAIN_ID }],
           });
-        } catch (switchErr: any) {
+        } catch (switchErr: unknown) {
           // Chain not added to MetaMask — add it
-          if (switchErr.code === 4902) {
+          if (switchErr && typeof switchErr === "object" && "code" in switchErr && switchErr.code === 4902) {
             await window.ethereum.request({
               method: "wallet_addEthereumChain",
               params: [
@@ -168,15 +168,19 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
       }
 
       setStatus("success");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("MetaMask vote error:", err);
 
-      if (err.code === 4001 || err.code === "ACTION_REJECTED") {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorCode = (err as { code?: number | string })?.code;
+      const shortMessage = (err as { shortMessage?: string })?.shortMessage;
+
+      if (errorCode === 4001 || errorCode === "ACTION_REJECTED") {
         setError("You rejected the transaction in MetaMask.");
-      } else if (err.message?.includes("insufficient funds")) {
+      } else if (errorMessage?.includes("insufficient funds")) {
         setError("Insufficient ETH for gas fees on Sepolia.");
       } else {
-        setError(err.shortMessage ?? err.message ?? "An unknown error occurred.");
+        setError(shortMessage ?? errorMessage ?? "An unknown error occurred.");
       }
       setStatus("error");
     }
@@ -188,6 +192,10 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
 // Augment window for TypeScript
 declare global {
   interface Window {
-    ethereum?: any;
+    ethereum?: {
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      on?: (eventName: string, handler: (params: unknown) => void) => void;
+      removeListener?: (eventName: string, handler: (params: unknown) => void) => void;
+    };
   }
 }

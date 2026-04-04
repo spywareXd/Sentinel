@@ -97,7 +97,7 @@ export default function CaseList({
                 </div>
 
                 <p className="mb-3 line-clamp-2 text-sm italic text-[var(--on-surface-variant)]">
-                  "{caseItem.flaggedMessage}"
+                  &quot;{caseItem.flaggedMessage}&quot;
                 </p>
 
                 <div className="flex flex-wrap items-center gap-6">

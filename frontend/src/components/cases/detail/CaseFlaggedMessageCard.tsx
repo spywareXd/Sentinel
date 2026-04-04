@@ -17,7 +17,7 @@ export default function CaseFlaggedMessageCard({
       </p>
       <div className="rounded-xl border-l-2 border-[var(--error)] bg-[var(--surface-container-high)] p-4">
         <p className="text-sm italic leading-7 text-[var(--on-surface)]">
-          "{caseItem.flaggedMessage}"
+          &quot;{caseItem.flaggedMessage}&quot;
         </p>
       </div>
       <div className="mt-3 flex items-center justify-between text-[10px]">

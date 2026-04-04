@@ -19,19 +19,24 @@ export default function ChatFeed({
   const feedRef = useRef<HTMLElement | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  // Syncing state during render is the recommended pattern to avoid cascading useEffect renders
+  const [prevMessages, setPrevMessages] = useState(messages);
+  if (messages !== prevMessages) {
+    setPrevMessages(messages);
+    if (openMenuId !== null) {
+      setOpenMenuId(null);
+    }
+  }
+
+  // Scroll to bottom when messages change
   useEffect(() => {
     const feed = feedRef.current;
-
-    if (!feed) return;
-
-    feed.scrollTo({
-      top: feed.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [messages]);
-
-  useEffect(() => {
-    setOpenMenuId(null);
+    if (feed) {
+      feed.scrollTo({
+        top: feed.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -39,13 +44,13 @@ export default function ChatFeed({
       if (!(event.target instanceof Element)) return;
 
       if (!event.target.closest('[data-message-menu-root="true"]')) {
-        setOpenMenuId(null);
+        if (openMenuId !== null) setOpenMenuId(null);
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpenMenuId(null);
+        if (openMenuId !== null) setOpenMenuId(null);
       }
     };
 
@@ -56,7 +61,7 @@ export default function ChatFeed({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, []);
+  }, [openMenuId]); // Added openMenuId as dependency to use latest value safely
 
   const handleCopy = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -79,7 +84,7 @@ export default function ChatFeed({
 
         {messages.length === 0 ? (
           <div className="rounded-[1.25rem] bg-[var(--surface-container-low)] px-5 py-6 text-sm text-[var(--on-surface-variant)]">
-            No messages matched "{searchQuery.trim()}".
+            No messages matched &quot;{searchQuery.trim()}&quot;.
           </div>
         ) : (
           <div className="flex flex-col">

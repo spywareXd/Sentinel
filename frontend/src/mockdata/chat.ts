@@ -1,4 +1,3 @@
-import { profileLogos } from "@/mockdata/profileLogos";
 import type { FeedMeta, Message } from "@/types/mockdata/chat";
 
 export const feedMeta: FeedMeta = {

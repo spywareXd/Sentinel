@@ -49,7 +49,30 @@ const mapDecision = (decision?: string | null): CaseDecision => {
 const mapStatus = (status?: string | null) =>
   status === "resolved" ? "Resolved" : "Assigned";
 
-const mapCaseRecord = (dbCase: any): CaseRecord => {
+interface DbCase {
+  id: string | number;
+  blockchain_case_id?: number | null;
+  decision?: string | null;
+  status?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  messages?: {
+    harmful_score?: number;
+    severe_score?: number;
+    reason?: string;
+    content?: string;
+  };
+  offender?: {
+    username?: string;
+    wallet_address?: string;
+  };
+  on_chain?: {
+    vote_count?: number;
+  };
+  toxicity_score?: number;
+}
+
+const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
   const harmfulScore = dbCase.messages?.harmful_score ?? dbCase.toxicity_score ?? 0;
   const severeScore = dbCase.messages?.severe_score ?? 0;
   const decision = mapDecision(dbCase.decision);
@@ -63,7 +86,7 @@ const mapCaseRecord = (dbCase: any): CaseRecord => {
     "Unknown user";
 
   return {
-    id: dbCase.id,
+    id: String(dbCase.id),
     number:
       dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
         ? `#${dbCase.blockchain_case_id}`
@@ -113,6 +136,8 @@ export default function CasesPage() {
   const [activeTopTab, setActiveTopTab] = useState<TopTab>("Assigned");
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [isDetailDismissed, setIsDetailDismissed] = useState(false);
+  const [searchQuery] = useState(""); // Restored searchQuery state
+
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [moderatorWallet, setModeratorWallet] = useState("");
@@ -124,8 +149,16 @@ export default function CasesPage() {
         if (activeTopTab === "Assigned") {
           return caseItem.assignedToMe;
         }
-
         return caseItem.status === "Resolved" && caseItem.wasAssignedToMe;
+      })
+      .filter((caseItem) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+          caseItem.title.toLowerCase().includes(q) ||
+          caseItem.id.toLowerCase().includes(q) ||
+          caseItem.offender.toLowerCase().includes(q)
+        );
       })
       .sort((left, right) => {
         if (left.status === "Resolved" && right.status !== "Resolved") return 1;
@@ -134,7 +167,23 @@ export default function CasesPage() {
         if (!left.assignedToMe && right.assignedToMe) return 1;
         return right.harmfulScore - left.harmfulScore;
       });
-  }, [activeTopTab, cases]);
+  }, [cases, activeTopTab, searchQuery]);
+
+  // Syncing state during render to avoid cascading useEffect renders
+  const [prevFiltered, setPrevFiltered] = useState(filteredCases);
+  if (filteredCases !== prevFiltered) {
+    setPrevFiltered(filteredCases);
+    if (filteredCases.length === 0) {
+      if (selectedCaseId !== null) setSelectedCaseId(null);
+    } else {
+      const hasSelected = filteredCases.some((c) => c.id === selectedCaseId);
+      if (!selectedCaseId || !hasSelected) {
+        if (selectedCaseId !== filteredCases[0].id) {
+          setSelectedCaseId(filteredCases[0].id);
+        }
+      }
+    }
+  }
 
   const selectedCase =
     (selectedCaseId
@@ -200,11 +249,6 @@ export default function CasesPage() {
 
       const mappedCases = (data ?? []).map(mapCaseRecord);
       setCases(mappedCases);
-      setSelectedCaseId((currentId) =>
-        currentId && mappedCases.some((caseItem) => caseItem.id === currentId)
-          ? currentId
-          : mappedCases[0]?.id ?? null,
-      );
       setIsLoading(false);
     };
 
@@ -258,21 +302,6 @@ export default function CasesPage() {
       document.removeEventListener("mousedown", handlePointerDown);
     };
   }, [selectedCaseId]);
-
-  useEffect(() => {
-    if (filteredCases.length === 0) {
-      setSelectedCaseId(null);
-      return;
-    }
-
-    if (isDetailDismissed && !selectedCaseId) {
-      return;
-    }
-
-    if (!selectedCaseId || !filteredCases.some((caseItem) => caseItem.id === selectedCaseId)) {
-      setSelectedCaseId(filteredCases[0].id);
-    }
-  }, [filteredCases, isDetailDismissed, selectedCaseId]);
 
   const resetCases = () => {
     setRefreshKey((currentKey) => currentKey + 1);

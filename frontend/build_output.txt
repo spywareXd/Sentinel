@@ -1,0 +1,39 @@
+﻿Ôû▓ Next.js 16.2.1 (webpack)
+- Environments: .env
+
+  Creating an optimized production build ...
+node.exe : Failed to compile.
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo          : No 
+   tSpecified: (Failed to compi  
+  le.:String) [], RemoteExcept   
+ ion
+    + FullyQualifiedErrorId : Na 
+   tiveCommandError
+ 
+
+./src/hooks/useMetaMaskVote.ts
+Module not found: Can't resolve 
+'ethers'
+
+https://nextjs.org/docs/messages/
+module-not-found
+
+Import trace for requested 
+module:
+./src/components/cases/detail/Cas
+eActions.tsx
+./src/components/cases/CaseDetail
+Panel.tsx
+./src/app/cases/page.tsx
+
+
+> Build failed because of 
+webpack errors

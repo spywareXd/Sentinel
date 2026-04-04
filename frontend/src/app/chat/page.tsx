@@ -57,7 +57,7 @@ export default function Home() {
 
       if (profiles) {
         setParticipants(
-          profiles.map((profileItem: any) => {
+          profiles.map((profileItem: { id: string; username: string | null }) => {
             const displayName = profileItem.username || "Unknown";
 
             return {
@@ -95,13 +95,13 @@ export default function Home() {
           .from("profiles")
           .select("id, username");
         const profileMap = new Map(
-          profilesData?.map((p: any) => [p.id, p.username]) || []
+          profilesData?.map((p: { id: string; username: string | null }) => [p.id, p.username]) || []
         );
 
-        const formatted: Message[] = messagesData.map((msg: any) => {
+        const formatted: Message[] = messagesData.map((msg: { id: string | number; user_id: string; created_at: string; content: string }) => {
           const msgUsername = profileMap.get(msg.user_id) || "Unknown User";
           return {
-            id: msg.id,
+            id: String(msg.id),
             author: msgUsername,
             authorInitials: msgUsername.substring(0, 1).toUpperCase(),
             time: new Date(msg.created_at).toLocaleTimeString([], {
@@ -124,12 +124,12 @@ export default function Home() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
-        async (payload: any) => {
+        async (payload: { new: { id: string | number; user_id: string; created_at: string; content: string } }) => {
           const newMsg = payload.new;
 
           // Skip if we already have this message (from optimistic update)
           setMessages((current) => {
-            if (current.some((m) => m.id === newMsg.id)) return current;
+            if (current.some((m) => m.id === String(newMsg.id))) return current;
             return current;
           });
 
@@ -140,7 +140,7 @@ export default function Home() {
             .single();
 
           const formattedNew: Message = {
-            id: newMsg.id,
+            id: String(newMsg.id),
             author: profileData?.username || "Unknown",
             authorInitials: (profileData?.username || "U")
               .substring(0, 1)
