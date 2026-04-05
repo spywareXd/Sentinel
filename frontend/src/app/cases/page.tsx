@@ -7,13 +7,9 @@ import CasesHeader from "@/components/cases/CasesHeader";
 import CaseList from "@/components/cases/CaseList";
 import CasesSummaryStrip from "@/components/cases/CasesSummaryStrip";
 import Sidebar from "@/components/layout/Sidebar";
+import { getBackendCandidates, getBackendConfigError } from "@/lib/backend";
 import type { CaseDecision, CaseRecord } from "@/types/mockdata/cases";
 import { createClient } from "@/utils/supabase/client";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
-const LOCAL_BACKEND_URL = "http://localhost:8000";
-const BACKEND_CANDIDATES =
-  BACKEND_URL === LOCAL_BACKEND_URL ? [BACKEND_URL] : [BACKEND_URL, LOCAL_BACKEND_URL];
 
 type TopTab = "Assigned" | "History";
 
@@ -240,8 +236,18 @@ export default function CasesPage() {
 
         let payload: { cases?: DbCase[] } | null = null;
         let lastFailure: unknown = null;
+        const backendCandidates = getBackendCandidates();
+        const backendConfigError = getBackendConfigError();
 
-        for (const baseUrl of BACKEND_CANDIDATES) {
+        if (backendCandidates.length === 0) {
+          lastFailure = backendConfigError ?? "No backend candidates available.";
+          console.error("Network error loading cases:", lastFailure);
+          setCases([]);
+          setSelectedCaseId(null);
+          return;
+        }
+
+        for (const baseUrl of backendCandidates) {
           try {
             const resp = await fetch(
               `${baseUrl}/moderation/my-cases?wallet_address=${encodeURIComponent(walletAddress)}`,

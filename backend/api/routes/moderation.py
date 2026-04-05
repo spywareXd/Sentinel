@@ -165,60 +165,67 @@ def sync_vote(body: VoteSyncRequest):
     Verifies the vote on-chain, then updates the moderation case in Supabase.
     If 2+ votes agree (majority), marks the case resolved.
     """
-    resp = supabase.table("moderation_cases").select("*").eq("id", body.case_id).single().execute()
-    if not resp.data:
-        raise HTTPException(status_code=404, detail="Case not found")
-    case = resp.data
-    print(
-        f"[VOTE SYNC] case_id={body.case_id} | "
-        f"blockchain_case_id={case.get('blockchain_case_id')} | "
-        f"moderator={body.moderator_address[:10]}... | "
-        f"vote={_vote_label(body.vote)} | tx={body.tx_hash}"
-    )
-
-    case, chain_case = _sync_case_resolution(case)
-    if case.get("status") == "resolved":
-        _log_vote_event(case, chain_case, "post-sync resolved", body.moderator_address, body.vote)
-        return {"success": True, "case_resolved": True, "decision": case.get("decision")}
-
-    if case.get("status") == "resolved":
-        raise HTTPException(status_code=400, detail="Case already resolved")
-
-    blockchain_case_id = case.get("blockchain_case_id")
-    if blockchain_case_id is None:
-        raise HTTPException(status_code=400, detail="Case has no blockchain ID yet")
-
-    on_chain = verify_vote_on_chain(blockchain_case_id, body.moderator_address)
-    if not on_chain.get("has_voted"):
-        raise HTTPException(
-            status_code=422,
-            detail="On-chain verification failed: vote not found on blockchain"
+    try:
+        resp = supabase.table("moderation_cases").select("*").eq("id", body.case_id).single().execute()
+        if not resp.data:
+            raise HTTPException(status_code=404, detail="Case not found")
+        case = resp.data
+        print(
+            f"[VOTE SYNC] case_id={body.case_id} | "
+            f"blockchain_case_id={case.get('blockchain_case_id')} | "
+            f"moderator={body.moderator_address[:10]}... | "
+            f"vote={_vote_label(body.vote)} | tx={body.tx_hash}"
         )
 
-    chain_case = get_case_from_chain(blockchain_case_id)
-    _log_vote_event(case, chain_case, "vote recorded", body.moderator_address, body.vote)
+        case, chain_case = _sync_case_resolution(case)
+        if case.get("status") == "resolved":
+            _log_vote_event(case, chain_case, "post-sync resolved", body.moderator_address, body.vote)
+            return {"success": True, "case_resolved": True, "decision": case.get("decision")}
 
-    if chain_case and chain_case.get("resolved"):
-        decision_code = chain_case.get("decision", 0)
-        decision = "punish" if decision_code == 1 else "dismiss"
-        case = finalize_case_resolution(case, decision)
+        blockchain_case_id = case.get("blockchain_case_id")
+        if blockchain_case_id is None:
+            raise HTTPException(status_code=400, detail="Case has no blockchain ID yet")
+
+        on_chain = verify_vote_on_chain(blockchain_case_id, body.moderator_address)
+        if not on_chain.get("has_voted"):
+            error_detail = on_chain.get("error")
+            detail = "On-chain verification failed: vote not found on blockchain"
+            if error_detail:
+                detail = f"On-chain verification failed: {error_detail}"
+            raise HTTPException(status_code=422, detail=detail)
+
+        chain_case = get_case_from_chain(blockchain_case_id)
+        _log_vote_event(case, chain_case, "vote recorded", body.moderator_address, body.vote)
+
+        if chain_case and chain_case.get("resolved"):
+            decision_code = chain_case.get("decision", 0)
+            decision = "punish" if decision_code == 1 else "dismiss"
+            case = finalize_case_resolution(case, decision)
+            return {
+                "success": True,
+                "vote_recorded": True,
+                "case_resolved": True,
+                "decision": case.get("decision"),
+                "tx_hash": body.tx_hash,
+                "on_chain": chain_case
+            }
+
         return {
             "success": True,
             "vote_recorded": True,
-            "case_resolved": True,
-            "decision": case.get("decision"),
+            "case_resolved": False,
+            "vote": body.vote,
             "tx_hash": body.tx_hash,
             "on_chain": chain_case
         }
-
-    return {
-        "success": True,
-        "vote_recorded": True,
-        "case_resolved": False,
-        "vote": body.vote,
-        "tx_hash": body.tx_hash,
-        "on_chain": chain_case
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[VOTE SYNC ERROR] case_id={body.case_id} | tx={body.tx_hash} | error={e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Vote was recorded on-chain, but backend sync failed: {e}"
+        )
 
 
 @router.get("/cases")

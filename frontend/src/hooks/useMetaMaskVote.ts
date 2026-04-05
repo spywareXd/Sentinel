@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { BrowserProvider, Contract } from "ethers";
+import { getBackendCandidates, getBackendConfigError } from "@/lib/backend";
 
 // Minimal ABI — only the castVote function
 const SENTINEL_ABI = [
@@ -29,7 +30,6 @@ const SENTINEL_ABI = [
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "";
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111 in hex
 
 export type VoteOption = "punish" | "dismiss";
@@ -55,6 +55,73 @@ export type UseMetaMaskVoteReturn = {
     moderatorAddress: string
   ) => Promise<void>;
   reset: () => void;
+};
+
+const isNetworkLikeError = (message: string) =>
+  /failed to fetch|networkerror|load failed|fetch failed/i.test(message);
+
+const getSyncFailureDetail = async (resp: Response, baseUrl: string) => {
+  const contentType = resp.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    const data = (await resp.json().catch(() => null)) as
+      | { detail?: unknown; error?: unknown; message?: unknown }
+      | null;
+
+    if (typeof data?.detail === "string" && data.detail.trim()) return data.detail;
+    if (typeof data?.error === "string" && data.error.trim()) return data.error;
+    if (typeof data?.message === "string" && data.message.trim()) return data.message;
+  }
+
+  const text = (await resp.text().catch(() => "")).trim();
+  if (text) {
+    const compactText = text.replace(/\s+/g, " ").slice(0, 240);
+    return `Backend sync via ${baseUrl} failed (${resp.status}): ${compactText}`;
+  }
+
+  return `Backend sync via ${baseUrl} failed with HTTP ${resp.status}.`;
+};
+
+const syncVoteToBackend = async (payload: {
+  case_id: string;
+  moderator_address: string;
+  vote: number;
+  tx_hash: string;
+}) => {
+  let lastFailure =
+    getBackendConfigError() ??
+    "Could not reach Sentinel backend to sync the vote. Check that backend main.py is running and NEXT_PUBLIC_BACKEND_URL or your tunnel is correct.";
+  const backendCandidates = getBackendCandidates();
+
+  if (backendCandidates.length === 0) {
+    throw new Error(lastFailure);
+  }
+
+  for (const baseUrl of backendCandidates) {
+    try {
+      const syncResp = await fetch(`${baseUrl}/moderation/vote/sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "bypass-tunnel-reminder": "true",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (syncResp.ok) {
+        return;
+      }
+
+      lastFailure = await getSyncFailureDetail(syncResp, baseUrl);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      lastFailure = isNetworkLikeError(message)
+        ? `Could not reach Sentinel backend at ${baseUrl}. Check that backend main.py is running and your tunnel or NEXT_PUBLIC_BACKEND_URL is still valid.`
+        : message;
+    }
+  }
+
+  throw new Error(lastFailure);
 };
 
 /**
@@ -139,7 +206,15 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
 
       // Re-get provider after potential network switch
       const signer = await new BrowserProvider(window.ethereum).getSigner();
+      const signerAddress = (await signer.getAddress()).toLowerCase();
+      const expectedModeratorAddress = moderatorAddress.toLowerCase();
       const contract = new Contract(CONTRACT_ADDRESS, SENTINEL_ABI, signer);
+
+      if (expectedModeratorAddress && signerAddress !== expectedModeratorAddress) {
+        console.warn(
+          `MetaMask signer ${signerAddress} does not match assigned moderator wallet ${expectedModeratorAddress}. Using signer address for backend sync.`
+        );
+      }
 
       // vote encoding: 1 = punish, 2 = dismiss
       const voteCode = vote === "punish" ? 1 : 2;
@@ -156,27 +231,12 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
 
       // --- 6. Sync result to backend ---
       setStatus("syncing");
-      const syncResp = await fetch(`${BACKEND_URL}/moderation/vote/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          case_id: supabaseCaseId,
-          moderator_address: moderatorAddress.toLowerCase(),
-          vote: voteCode,
-          tx_hash: tx.hash,
-        }),
+      await syncVoteToBackend({
+        case_id: supabaseCaseId,
+        moderator_address: signerAddress,
+        vote: voteCode,
+        tx_hash: tx.hash,
       });
-
-      if (!syncResp.ok) {
-        const data = await syncResp.json().catch(() => ({}));
-        const detail =
-          typeof data?.detail === "string"
-            ? data.detail
-            : typeof data?.error === "string"
-              ? data.error
-              : "Vote was recorded on-chain, but Sentinel could not update moderation_cases.";
-        throw new Error(detail);
-      }
 
       setStatus("success");
     } catch (err: unknown) {
