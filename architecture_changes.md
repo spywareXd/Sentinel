@@ -1,6 +1,6 @@
 # Architecture Changes
 
-This note is meant to give future engineers and AI agents a quick feel for what changed in this timeline, what surfaces were intentionally reshaped, and what architectural preference seems to be emerging from the current branch.
+This note is meant to give future engineers and AI agents a quick feel for what changed in this timeline, what surfaces were intentionally reshaped, and what architectural preference still seems to be preferred even where this branch took temporary shortcuts.
 
 It is written as context, not as a strict rulebook.
 
@@ -97,7 +97,7 @@ Relevant code:
 - `frontend/src/app/cases/page.tsx`
 - `frontend/src/components/cases/CaseDetailPanel.tsx`
 
-### Cases context shifted from backend-fetching toward DB-facing reads
+### Cases context shifted from backend-fetching toward DB-facing reads for this branch
 
 The list view for `Cases` now reads directly from `moderation_cases` instead of depending on the backend route just to render the queue.
 
@@ -107,7 +107,7 @@ This appears to have been motivated by practical stability:
 - some backend assumptions lagged behind the live schema
 - direct read access to the presentational data was simpler for the current branch
 
-That means some frontend context clearly moved from backend-facing to DB-facing in this timeline.
+That means some frontend context clearly moved from backend-facing to DB-facing in this timeline, but the move reads more like a demo-oriented branch concession than a long-term architectural preference.
 
 Relevant code:
 
@@ -182,17 +182,17 @@ In that sense, some frontend context did shift from backend-facing to DB-facing.
 
 Even with that shift, the stronger architectural preference still appears to be:
 
-- UI rendering can read directly from Supabase when helpful
+- this branch uses direct Supabase reads in a few places for demo stability
+- that should not be read as "Supabase imports are the better system design"
+- if another engineer or agent is working in a fuller system, they should prefer the local backend API or whatever page-level server/data layer the app already uses
 - business logic should continue to live behind backend APIs or backend services
 
-That means it may be reasonable to read directly from Supabase for:
+So the more reusable interpretation is:
 
-- chat message rendering
-- participant lists
-- case lists
-- punishment history
+- direct Supabase reads are acceptable in this branch where they unblock demos or compensate for backend drift
+- but the preferred architecture for future work is still to consume backend endpoints, server actions, or existing page-level data-fetching logic rather than teaching more frontend code to query Supabase directly
 
-But it still seems more aligned with the project direction to keep these in the backend:
+It still seems more aligned with the project direction to keep these in the backend:
 
 - moderation case creation
 - moderator assignment
@@ -204,12 +204,12 @@ But it still seems more aligned with the project direction to keep these in the 
 
 So the tone to carry forward is not:
 
-- "never query Supabase directly from the frontend"
+- "this branch queried Supabase directly, so that must be the preferred pattern"
 
 It is more like:
 
-- "for product state display, direct DB reads can be practical"
-- "for backend logic, consensus, enforcement, and orchestration, backend APIs remain the better home"
+- "for this demo branch, direct DB reads were sometimes the fastest stabilizer"
+- "for the actual architecture, backend APIs and backend-owned logic remain the preferred home"
 
 ## Suggestive context for future AI agents
 
@@ -219,7 +219,8 @@ If you are making future changes in this repo, it may help to think in these ter
 - moderation is meant to feel embedded into the user experience, not bolted on
 - newer cases should feel actionable first, not merely severe first
 - punishment state should remain inspectable and user-visible
-- read-only frontend views may reasonably pull from Supabase when the backend is unstable
+- this branch contains some direct Supabase reads for demo purposes
+- future work should avoid treating those reads as the architectural gold standard
 - backend logic still seems better placed behind backend APIs than inside raw frontend DB workflows
 
 ## Short version
@@ -233,6 +234,6 @@ The current branch suggests a product that is becoming:
 
 And at the architectural level, the branch suggests a compromise:
 
-- direct DB reads are acceptable for UI context
+- direct DB reads happened here as a practical workaround
 - backend logic should still be thought of as backend-owned
-
+- future implementations should generally prefer backend endpoints or existing application data layers over adding more raw Supabase querying to the frontend
