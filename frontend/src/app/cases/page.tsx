@@ -7,7 +7,7 @@ import CasesHeader from "@/components/cases/CasesHeader";
 import CaseList from "@/components/cases/CaseList";
 import CasesSummaryStrip from "@/components/cases/CasesSummaryStrip";
 import Sidebar from "@/components/layout/Sidebar";
-import { getBackendCandidates, getBackendConfigError } from "@/lib/backend";
+import { getBackendCandidates, getBackendConfigError } from "../../lib/backend";
 import type { CaseDecision, CaseRecord } from "@/types/mockdata/cases";
 import { createClient } from "@/utils/supabase/client";
 

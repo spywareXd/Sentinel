@@ -1,17 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-body",
-  subsets: ["latin"],
-});
-
-const manrope = Manrope({
-  variable: "--font-headline",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-});
 
 export const metadata: Metadata = {
   title: "SentinelDAO",
@@ -23,11 +11,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const fontVariables = {
+    "--font-body":
+      '"Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    "--font-headline":
+      '"Trebuchet MS", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
+  } as React.CSSProperties;
+
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${manrope.variable} h-full antialiased`}
-    >
+    <html lang="en" className="h-full antialiased" style={fontVariables}>
       <head>
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"

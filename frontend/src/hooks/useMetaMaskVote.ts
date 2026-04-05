@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BrowserProvider, Contract } from "ethers";
-import { getBackendCandidates, getBackendConfigError } from "@/lib/backend";
+import { getBackendCandidates, getBackendConfigError } from "../lib/backend";
 
 // Minimal ABI — only the castVote function
 const SENTINEL_ABI = [
