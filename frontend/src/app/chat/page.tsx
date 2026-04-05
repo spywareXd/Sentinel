@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ChatFeed from "@/components/chat/ChatFeed";
 import Composer from "@/components/chat/Composer";
@@ -81,7 +81,7 @@ const formatPunishmentLabel = (punishmentType?: string | null) => {
     .join(" ")} Active`;
 };
 
-export default function Home() {
+function ChatPageContent() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -147,7 +147,7 @@ export default function Home() {
     hasLoadedMessages &&
     !messages.some((message) => message.id === focusMessageId);
 
-  const fetchActivePunishment = async (
+  const fetchActivePunishment = useCallback(async (
     currentUserId: string,
     currentWalletAddress?: string | null,
   ): Promise<UserPunishment | null> => {
@@ -203,7 +203,7 @@ export default function Home() {
     }
 
     return isActivePunishment(latestPunishment) ? latestPunishment : null;
-  };
+  }, [supabase]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -255,7 +255,7 @@ export default function Home() {
     };
 
     void getUser();
-  }, [router, supabase]);
+  }, [fetchActivePunishment, router, supabase]);
 
   useEffect(() => {
     if (!userId) return;
@@ -289,7 +289,7 @@ export default function Home() {
       window.clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [supabase, userId, walletAddress]);
+  }, [fetchActivePunishment, supabase, userId, walletAddress]);
 
   useEffect(() => {
     if (!activePunishment || !hasActivePunishment) return;
@@ -325,11 +325,6 @@ export default function Home() {
 
     return () => window.clearInterval(interval);
   }, [activePunishment, hasActivePunishment]);
-
-  useEffect(() => {
-    if (hasActivePunishment) return;
-    setAcknowledgedPunishmentId(null);
-  }, [hasActivePunishment]);
 
   useEffect(() => {
     if (!userId) return;
@@ -565,5 +560,19 @@ export default function Home() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-[var(--background)] text-sm text-[var(--on-surface-variant)]">
+          Loading chat...
+        </div>
+      }
+    >
+      <ChatPageContent />
+    </Suspense>
   );
 }

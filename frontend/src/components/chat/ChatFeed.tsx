@@ -20,9 +20,11 @@ export default function ChatFeed({
 }: ChatFeedProps) {
   const feedRef = useRef<HTMLElement | null>(null);
   const focusResetTimeoutRef = useRef<number | null>(null);
+  const focusActivateFrameRef = useRef<number | null>(null);
   const lastHandledFocusRef = useRef<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const effectiveHighlightedMessageId = focusMessageId ? highlightedMessageId : null;
 
   // Syncing state during render is the recommended pattern to avoid cascading useEffect renders
   const [prevMessages, setPrevMessages] = useState(messages);
@@ -71,7 +73,6 @@ export default function ChatFeed({
   useEffect(() => {
     if (!focusMessageId) {
       lastHandledFocusRef.current = null;
-      setHighlightedMessageId(null);
       if (focusResetTimeoutRef.current !== null) {
         window.clearTimeout(focusResetTimeoutRef.current);
         focusResetTimeoutRef.current = null;
@@ -94,7 +95,14 @@ export default function ChatFeed({
       block: "center",
     });
 
-    setHighlightedMessageId(focusMessageId);
+    if (focusActivateFrameRef.current !== null) {
+      window.cancelAnimationFrame(focusActivateFrameRef.current);
+    }
+
+    focusActivateFrameRef.current = window.requestAnimationFrame(() => {
+      setHighlightedMessageId(focusMessageId);
+      focusActivateFrameRef.current = null;
+    });
     lastHandledFocusRef.current = focusMessageId;
 
     if (focusResetTimeoutRef.current !== null) {
@@ -108,6 +116,10 @@ export default function ChatFeed({
     }, 3000);
 
     return () => {
+      if (focusActivateFrameRef.current !== null) {
+        window.cancelAnimationFrame(focusActivateFrameRef.current);
+        focusActivateFrameRef.current = null;
+      }
       if (focusResetTimeoutRef.current !== null) {
         window.clearTimeout(focusResetTimeoutRef.current);
         focusResetTimeoutRef.current = null;
@@ -151,7 +163,7 @@ export default function ChatFeed({
                     <MessageRow
                       message={{
                         ...msgWithGrouped,
-                        isFocused: highlightedMessageId === message.id,
+                        isFocused: effectiveHighlightedMessageId === message.id,
                       }}
                       shouldOpenUp={index >= messages.length - 3}
                       isMenuOpen={openMenuId === message.id}
