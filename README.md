@@ -30,6 +30,8 @@ cd backend
 uv run uvicorn api.main:app --reload --port 8000   
 ```
 
+
+
 ### 4. Public Tunnel (For Vercel / Remote Testing)
 If your frontend is hosted on Vercel, you need to expose your local backend to the internet.
 
