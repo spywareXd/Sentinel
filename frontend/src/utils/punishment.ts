@@ -7,9 +7,6 @@ const toValidDate = (value?: string | null) => {
 };
 
 export const getPunishmentExpiry = (punishment: UserPunishment): Date | null => {
-  const explicitExpiry = toValidDate(punishment.expires_at);
-  if (explicitExpiry) return explicitExpiry;
-
   const issuedAt = toValidDate(punishment.issued_at);
   if (!issuedAt) return null;
 
@@ -23,6 +20,20 @@ export const getPunishmentExpiry = (punishment: UserPunishment): Date | null => 
 
   return null;
 };
+
+export const isExpiredActivePunishment = (punishment: UserPunishment): boolean => {
+  if (!punishment.is_active) return false;
+
+  const expiry = getPunishmentExpiry(punishment);
+  if (!expiry) return false;
+
+  return expiry.getTime() <= Date.now();
+};
+
+export const getExpiredActivePunishmentIds = (
+  punishments: UserPunishment[] | null | undefined,
+): string[] =>
+  [...new Set((punishments ?? []).filter(isExpiredActivePunishment).map((punishment) => punishment.id))];
 
 export const isActivePunishment = (punishment: UserPunishment): boolean => {
   if (!punishment.is_active) return false;

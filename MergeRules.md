@@ -213,9 +213,8 @@ Any punishment countdown/timer logic must:
 - tolerate zero-duration punishments
 - tolerate warnings that do not expire
 - tolerate backend branches that provide:
-  - `expires_at`
-  - or `issued_at + duration`
-  - or `duration_hours`
+- `issued_at + duration`
+- or `duration_hours`
 
 Never let the UI crash because one timestamp is absent.
 

@@ -8,12 +8,26 @@ import PunishmentPopout from "@/components/chat/PunishmentPopout";
 import RightRail from "@/components/layout/RightRail";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
-import { getPunishmentExpiry, isActivePunishment } from "@/utils/punishment";
+import {
+  getExpiredActivePunishmentIds,
+  getPunishmentExpiry,
+  isActivePunishment,
+} from "@/utils/punishment";
 import { roomDetails } from "@/mockdata/room";
 import type { UserPunishment } from "@/types/database/userPunishment";
 import type { Message } from "@/types/mockdata/chat";
 import type { RoomMember } from "@/types/mockdata/room";
 import { createClient } from "@/utils/supabase/client";
+
+const normalizeWalletAddress = (value?: string | null) => value?.trim().toLowerCase() || "";
+
+const findLatestPunishment = (rows: UserPunishment[] | null | undefined) =>
+  [...(rows ?? [])]
+    .sort((left, right) => {
+      const leftTime = new Date(left.issued_at).getTime();
+      const rightTime = new Date(right.issued_at).getTime();
+      return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
+    })[0] ?? null;
 
 export default function Home() {
   const supabase = useMemo(() => createClient(), []);
@@ -65,6 +79,66 @@ export default function Home() {
     return hours > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
   }, [activePunishment, countdownNowMs]);
 
+  const fetchActivePunishment = async (
+    currentUserId: string,
+    currentWalletAddress?: string | null,
+  ): Promise<UserPunishment | null> => {
+    const normalizedWallet = normalizeWalletAddress(currentWalletAddress);
+    const deactivatePunishments = async (punishments: UserPunishment[] | null | undefined) => {
+      const expiredIds = getExpiredActivePunishmentIds(punishments);
+      if (!expiredIds.length) return;
+
+      const { error } = await supabase
+        .from("user_punishments")
+        .update({ is_active: false })
+        .in("id", expiredIds);
+
+      if (error) {
+        console.error("Error deactivating expired punishments:", error);
+      }
+    };
+
+    const byUserResult = await supabase
+      .from("user_punishments")
+      .select("*")
+      .eq("user_id", currentUserId)
+      .eq("is_active", true)
+      .order("issued_at", { ascending: false });
+
+    if (byUserResult.error) {
+      console.error("Error loading active punishment by user_id:", byUserResult.error);
+    }
+
+    const byUserRows = (byUserResult.data as UserPunishment[] | null) ?? [];
+    await deactivatePunishments(byUserRows);
+    const byUserPunishment = findLatestPunishment(byUserRows.filter(isActivePunishment));
+    if (byUserPunishment) {
+      return byUserPunishment;
+    }
+
+    if (!normalizedWallet) {
+      return null;
+    }
+
+    const byWalletResult = await supabase
+      .from("user_punishments")
+      .select("*")
+      .eq("wallet_address", normalizedWallet)
+      .eq("is_active", true)
+      .order("issued_at", { ascending: false });
+
+    if (byWalletResult.error) {
+      console.error("Error loading active punishment by wallet_address:", byWalletResult.error);
+      return null;
+    }
+
+    const byWalletRows = (byWalletResult.data as UserPunishment[] | null) ?? [];
+    await deactivatePunishments(byWalletRows);
+    const byWalletPunishment = findLatestPunishment(byWalletRows.filter(isActivePunishment));
+
+    return byWalletPunishment ?? null;
+  };
+
   // 1. Get the logged-in user's session and profile on mount
   useEffect(() => {
     const getUser = async () => {
@@ -90,21 +164,8 @@ export default function Home() {
         setWalletAddress(profile.wallet_address || "");
       }
 
-      const { data: punishment } = await supabase
-        .from("user_punishments")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .order("issued_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (punishment) {
-        const typedPunishment = punishment as UserPunishment;
-        setActivePunishment(isActivePunishment(typedPunishment) ? typedPunishment : null);
-      } else {
-        setActivePunishment(null);
-      }
+      const punishment = await fetchActivePunishment(user.id, profile?.wallet_address);
+      setActivePunishment(punishment);
 
       const { data: profiles } = await supabase
         .from("profiles")
@@ -136,24 +197,10 @@ export default function Home() {
     let isMounted = true;
 
     const refreshActivePunishment = async () => {
-      const { data: punishment } = await supabase
-        .from("user_punishments")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("is_active", true)
-        .order("issued_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
       if (!isMounted) return;
-
-      if (!punishment) {
-        setActivePunishment(null);
-        return;
-      }
-
-      const typedPunishment = punishment as UserPunishment;
-      setActivePunishment(isActivePunishment(typedPunishment) ? typedPunishment : null);
+      const punishment = await fetchActivePunishment(userId, walletAddress);
+      if (!isMounted) return;
+      setActivePunishment(punishment);
     };
 
     const channel = supabase
@@ -176,7 +223,7 @@ export default function Home() {
       window.clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [supabase, userId]);
+  }, [supabase, userId, walletAddress]);
 
   useEffect(() => {
     if (!activePunishment) return;
@@ -185,6 +232,15 @@ export default function Home() {
     if (!expiresAt) return;
 
     const timeout = window.setTimeout(() => {
+      void supabase
+        .from("user_punishments")
+        .update({ is_active: false })
+        .eq("id", activePunishment.id)
+        .then(({ error }) => {
+          if (error) {
+            console.error("Error marking punishment inactive after expiry:", error);
+          }
+        });
       setActivePunishment(null);
     }, Math.max(0, expiresAt.getTime() - Date.now()) + 250);
 

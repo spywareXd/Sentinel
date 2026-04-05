@@ -7,10 +7,16 @@ import ActivityHeader from "@/components/activity/ActivityHeader";
 import ActivityList from "@/components/activity/ActivityList";
 import ActivitySummaryStrip from "@/components/activity/ActivitySummaryStrip";
 import Sidebar from "@/components/layout/Sidebar";
-import { getPunishmentExpiry, isActivePunishment } from "@/utils/punishment";
+import {
+  getExpiredActivePunishmentIds,
+  getPunishmentExpiry,
+  isActivePunishment,
+} from "@/utils/punishment";
 import type { ActivityRecord } from "@/types/activity";
 import type { UserPunishment } from "@/types/database/userPunishment";
 import { createClient } from "@/utils/supabase/client";
+
+const normalizeWalletAddress = (value?: string | null) => value?.trim().toLowerCase() || "";
 
 const formatPunishmentType = (value: string) =>
   value
@@ -65,6 +71,20 @@ const getIssuedTimestamp = (punishment: Pick<UserPunishment, "issued_at">) => {
   return Number.isNaN(issuedAt) ? 0 : issuedAt;
 };
 
+const sortPunishments = (rows: UserPunishment[] | null | undefined) =>
+  [...(rows ?? [])].sort((left, right) => getIssuedTimestamp(right) - getIssuedTimestamp(left));
+
+const applyInactiveState = (punishments: UserPunishment[] | null | undefined, punishmentIds: string[]) => {
+  if (!punishmentIds.length) return [...(punishments ?? [])];
+
+  const expiredSet = new Set(punishmentIds);
+  return [...(punishments ?? [])].map((punishment) =>
+    expiredSet.has(punishment.id)
+      ? { ...punishment, is_active: false }
+      : punishment,
+  );
+};
+
 const mapActivityRecord = (punishment: UserPunishment): ActivityRecord => {
   const isActive = Boolean(punishment.is_active) && isActivePunishment(punishment);
   const typeLabel = formatPunishmentType(punishment.punishment_type);
@@ -75,7 +95,7 @@ const mapActivityRecord = (punishment: UserPunishment): ActivityRecord => {
     punishmentType: typeLabel,
     status: isActive ? "Active" : "Expired",
     issuedAt: formatTimestamp(punishment.issued_at),
-    expiresAt: formatTimestamp(getPunishmentExpiry(punishment)?.toISOString() ?? punishment.expires_at),
+    expiresAt: formatTimestamp(getPunishmentExpiry(punishment)?.toISOString()),
     durationLabel: formatDuration(punishment),
     reason: punishment.reason?.trim() || "No reason was attached to this punishment.",
     caseReference: punishment.case_id ? `Case ${punishment.case_id}` : "No linked case",
@@ -97,6 +117,21 @@ export default function ActivityPage() {
 
     const loadActivity = async () => {
       setIsLoading(true);
+      const deactivateExpiredPunishments = async (punishments: UserPunishment[] | null | undefined) => {
+        const expiredIds = getExpiredActivePunishmentIds(punishments);
+        if (!expiredIds.length) return applyInactiveState(punishments, []);
+
+        const { error } = await supabase
+          .from("user_punishments")
+          .update({ is_active: false })
+          .in("id", expiredIds);
+
+        if (error) {
+          console.error("Error deactivating expired punishments in activity:", error);
+        }
+
+        return applyInactiveState(punishments, expiredIds);
+      };
 
       const {
         data: { user },
@@ -108,7 +143,15 @@ export default function ActivityPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("wallet_address")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const normalizedWallet = normalizeWalletAddress(profile?.wallet_address);
+
+      const byUserResult = await supabase
         .from("user_punishments")
         .select("*")
         .eq("user_id", user.id)
@@ -116,17 +159,40 @@ export default function ActivityPage() {
 
       if (!isMounted) return;
 
-      if (error) {
-        console.error("Error loading activity:", error);
+      if (byUserResult.error) {
+        console.error("Error loading activity by user_id:", byUserResult.error);
+      }
+
+      let punishments = await deactivateExpiredPunishments(
+        sortPunishments(byUserResult.data as UserPunishment[] | null),
+      );
+
+      if (!punishments.length && normalizedWallet) {
+        const byWalletResult = await supabase
+          .from("user_punishments")
+          .select("*")
+          .eq("wallet_address", normalizedWallet)
+          .order("issued_at", { ascending: false });
+
+        if (!isMounted) return;
+
+        if (byWalletResult.error) {
+          console.error("Error loading activity by wallet_address:", byWalletResult.error);
+        } else {
+          punishments = await deactivateExpiredPunishments(
+            sortPunishments(byWalletResult.data as UserPunishment[] | null),
+          );
+        }
+      }
+
+      if (!punishments.length && byUserResult.error) {
         setRecords([]);
         setSelectedActivityId(null);
         setIsLoading(false);
         return;
       }
 
-      const mappedRecords = ((data ?? []) as UserPunishment[])
-        .sort((left, right) => getIssuedTimestamp(right) - getIssuedTimestamp(left))
-        .map(mapActivityRecord);
+      const mappedRecords = punishments.map(mapActivityRecord);
       setRecords(mappedRecords);
       setSelectedActivityId((current) => current ?? mappedRecords[0]?.id ?? null);
       setIsLoading(false);
@@ -167,8 +233,21 @@ export default function ActivityPage() {
               .order("issued_at", { ascending: false });
 
             if (error || isCancelled) return;
-            const mappedRecords = ((data ?? []) as UserPunishment[])
-              .sort((left, right) => getIssuedTimestamp(right) - getIssuedTimestamp(left))
+            const punishments = sortPunishments((data ?? []) as UserPunishment[]);
+            const expiredIds = getExpiredActivePunishmentIds(punishments);
+
+            if (expiredIds.length) {
+              const { error: deactivateError } = await supabase
+                .from("user_punishments")
+                .update({ is_active: false })
+                .in("id", expiredIds);
+
+              if (deactivateError) {
+                console.error("Error deactivating expired punishments in activity realtime:", deactivateError);
+              }
+            }
+
+            const mappedRecords = applyInactiveState(punishments, expiredIds)
               .map(mapActivityRecord);
             setRecords(mappedRecords);
           },
