@@ -1,6 +1,6 @@
 export type CaseSeverity = "High" | "Medium" | "Low";
 
-export type CaseStatus = "Assigned" | "Voting" | "Resolved";
+export type CaseStatus = "Assigned" | "Voting" | "Resolved" | "Backend Error";
 
 export type CaseDecision = "Punished" | "Dismissed" | null;
 

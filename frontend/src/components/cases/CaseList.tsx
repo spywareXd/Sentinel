@@ -71,7 +71,7 @@ export default function CaseList({
                 "group flex cursor-pointer gap-6 rounded-3xl border-l-[5px] p-5 text-left transition-all",
                 isSelected
                   ? "bg-[var(--surface-container-high)]"
-                  : caseItem.status === "Resolved"
+                  : !caseItem.assignedToMe
                     ? "bg-[var(--surface-container-lowest)] opacity-70 hover:opacity-100"
                     : "bg-[var(--surface-container-low)] hover:bg-[var(--surface-bright)]",
               ].join(" ")}
@@ -146,7 +146,9 @@ export default function CaseList({
                   <span className="text-[10px] font-black text-[var(--on-surface-variant)]">
                     {caseItem.status === "Resolved"
                       ? caseItem.decision
-                      : `${Math.round(caseItem.harmfulScore * 100)}%`}
+                      : caseItem.status === "Backend Error"
+                        ? "Backend Error"
+                        : `${Math.round(caseItem.harmfulScore * 100)}%`}
                   </span>
                 </div>
               </div>

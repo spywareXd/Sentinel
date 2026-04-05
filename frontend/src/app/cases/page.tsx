@@ -12,6 +12,14 @@ import { createClient } from "@/utils/supabase/client";
 
 type TopTab = "Assigned" | "History";
 const LOCAL_BACKEND_URL = "http://localhost:8000";
+const LOCAL_RECORDED_VOTES_KEY = "sentinel:recorded-on-chain-votes";
+
+type LocalRecordedVote = {
+  decision: "Punished" | "Dismissed";
+  recordedAt: string;
+};
+
+type LocalRecordedVoteCache = Record<string, LocalRecordedVote>;
 
 const isLocalHostname = (hostname: string) =>
   hostname === "localhost" || hostname === "127.0.0.1";
@@ -47,6 +55,60 @@ const getBackendConfigError = () => {
   }
 
   return "No public backend URL is configured in the deployed frontend bundle. Set NEXT_PUBLIC_BACKEND_URL in Vercel and redeploy.";
+};
+
+const buildRecordedVoteCacheKey = (walletAddress: string, caseId: string) =>
+  `${walletAddress}:${caseId}`;
+
+const readRecordedVoteCache = (): LocalRecordedVoteCache => {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(LOCAL_RECORDED_VOTES_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as LocalRecordedVoteCache;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (err) {
+    console.error("Could not read locally recorded votes cache:", err);
+    return {};
+  }
+};
+
+const writeRecordedVoteCache = (cache: LocalRecordedVoteCache) => {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(
+    LOCAL_RECORDED_VOTES_KEY,
+    JSON.stringify(cache),
+  );
+};
+
+const rememberRecordedVote = (
+  walletAddress: string,
+  caseId: string,
+  decision: "Punished" | "Dismissed",
+) => {
+  if (!walletAddress) return;
+
+  const cache = readRecordedVoteCache();
+  cache[buildRecordedVoteCacheKey(walletAddress, caseId)] = {
+    decision,
+    recordedAt: new Date().toISOString(),
+  };
+  writeRecordedVoteCache(cache);
+};
+
+const forgetRecordedVote = (walletAddress: string, caseId: string) => {
+  if (!walletAddress) return;
+
+  const cache = readRecordedVoteCache();
+  const cacheKey = buildRecordedVoteCacheKey(walletAddress, caseId);
+
+  if (!(cacheKey in cache)) return;
+
+  delete cache[cacheKey];
+  writeRecordedVoteCache(cache);
 };
 
 const toTitleCase = (value: string) =>
@@ -91,7 +153,7 @@ const mapDecision = (decision?: string | null): CaseDecision => {
 };
 
 const mapStatus = (status?: string | null) =>
-  status === "resolved" ? "Resolved" : "Assigned";
+  status === "resolved" ? "Resolved" : status === "voting" ? "Voting" : "Assigned";
 
 interface DbCase {
   id: string | number;
@@ -177,6 +239,82 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
   };
 };
 
+const moveCaseToHistoryAfterRecordedVote = (
+  caseItem: CaseRecord,
+  decision?: "Punished" | "Dismissed",
+): CaseRecord => {
+  if (caseItem.status === "Resolved") {
+    return caseItem;
+  }
+
+  const votePhrase =
+    decision === "Punished"
+      ? "punishment"
+      : decision === "Dismissed"
+        ? "dismissal"
+        : "your decision";
+
+  return {
+    ...caseItem,
+    status: "Backend Error",
+    assignedToMe: false,
+    wasAssignedToMe: true,
+    needsVote: false,
+    resolvedAt: "Backend Error",
+    summary:
+      "Your vote is already recorded on-chain, but Sentinel hit a backend error while syncing this case. Final decision is still pending.",
+    voteBreakdown:
+      "Your vote is already recorded on-chain. Backend sync error; final tally pending.",
+    outcome: `The blockchain already accepted ${votePhrase}, but backend registration failed. Final verdict pending.`,
+  };
+};
+
+const applyRecordedVoteFallback = (
+  walletAddress: string,
+  caseItems: CaseRecord[],
+) => {
+  if (typeof window === "undefined" || !walletAddress) {
+    return caseItems;
+  }
+
+  const cache = readRecordedVoteCache();
+  const caseIds = new Set(caseItems.map((caseItem) => caseItem.id));
+  let didMutateCache = false;
+
+  for (const cacheKey of Object.keys(cache)) {
+    if (!cacheKey.startsWith(`${walletAddress}:`)) continue;
+
+    const caseId = cacheKey.slice(walletAddress.length + 1);
+    if (!caseIds.has(caseId)) {
+      delete cache[cacheKey];
+      didMutateCache = true;
+    }
+  }
+
+  const nextCases = caseItems.map((caseItem) => {
+    const cacheKey = buildRecordedVoteCacheKey(walletAddress, caseItem.id);
+    const cachedVote = cache[cacheKey];
+
+    if (!cachedVote) {
+      return caseItem;
+    }
+
+    if (caseItem.status === "Resolved" || !caseItem.assignedToMe) {
+      delete cache[cacheKey];
+      didMutateCache = true;
+      return caseItem;
+    }
+
+    return moveCaseToHistoryAfterRecordedVote(caseItem, cachedVote.decision);
+  });
+
+  if (didMutateCache) {
+    writeRecordedVoteCache(cache);
+  }
+
+  return nextCases;
+};
+
 export default function CasesPage() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -196,7 +334,7 @@ export default function CasesPage() {
         if (activeTopTab === "Assigned") {
           return caseItem.assignedToMe;
         }
-        return caseItem.status === "Resolved" && caseItem.wasAssignedToMe;
+        return caseItem.wasAssignedToMe && !caseItem.assignedToMe;
       })
       .filter((caseItem) => {
         if (!searchQuery.trim()) return true;
@@ -207,13 +345,7 @@ export default function CasesPage() {
           caseItem.offender.toLowerCase().includes(q)
         );
       })
-      .sort((left, right) => {
-        if (left.status === "Resolved" && right.status !== "Resolved") return 1;
-        if (left.status !== "Resolved" && right.status === "Resolved") return -1;
-        if (left.assignedToMe && !right.assignedToMe) return -1;
-        if (!left.assignedToMe && right.assignedToMe) return 1;
-        return right.createdAtTimestamp - left.createdAtTimestamp;
-      });
+      .sort((left, right) => right.createdAtTimestamp - left.createdAtTimestamp);
   }, [cases, activeTopTab, searchQuery]);
 
   const selectedCase =
@@ -308,7 +440,10 @@ export default function CasesPage() {
           return;
         }
 
-        const mappedCases = (payload.cases ?? []).map(mapCaseRecord);
+        const mappedCases = applyRecordedVoteFallback(
+          walletAddress,
+          (payload.cases ?? []).map(mapCaseRecord),
+        );
         setCases(mappedCases);
       } catch (err) {
         console.error("Network error loading cases:", err);
@@ -323,6 +458,7 @@ export default function CasesPage() {
   }, [refreshKey, router, supabase]);
 
   const resolveCase = (caseId: string, decision: "Punished" | "Dismissed") => {
+    forgetRecordedVote(moderatorWallet, caseId);
     setCases((currentCases) =>
       currentCases.map((caseItem) => {
         if (caseItem.id !== caseId || caseItem.status === "Resolved") {
@@ -345,6 +481,22 @@ export default function CasesPage() {
         };
       }),
     );
+  };
+
+  const markCaseAsRecordedOnChain = (
+    caseId: string,
+    decision: "Punished" | "Dismissed",
+  ) => {
+    rememberRecordedVote(moderatorWallet, caseId, decision);
+    setCases((currentCases) =>
+      currentCases.map((caseItem) =>
+        caseItem.id === caseId
+          ? moveCaseToHistoryAfterRecordedVote(caseItem, decision)
+          : caseItem,
+      ),
+    );
+    setActiveTopTab("History");
+    setSelectedCaseId(caseId);
   };
 
   useEffect(() => {
@@ -436,6 +588,9 @@ export default function CasesPage() {
                   onVoteSuccess={(decision) => {
                     resolveCase(selectedCase.id, decision);
                     setRefreshKey((currentKey) => currentKey + 1);
+                  }}
+                  onVoteRecordedOnChain={(decision) => {
+                    markCaseAsRecordedOnChain(selectedCase.id, decision);
                   }}
                 />
               </div>

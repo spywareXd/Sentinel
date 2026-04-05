@@ -9,12 +9,14 @@ type CaseDetailPanelProps = {
   caseItem: CaseRecord;
   moderatorAddress: string;
   onVoteSuccess: (decision: "Punished" | "Dismissed") => void;
+  onVoteRecordedOnChain: (decision: "Punished" | "Dismissed") => void;
 };
 
 export default function CaseDetailPanel({
   caseItem,
   moderatorAddress,
   onVoteSuccess,
+  onVoteRecordedOnChain,
 }: CaseDetailPanelProps) {
   return (
     <aside
@@ -31,11 +33,13 @@ export default function CaseDetailPanel({
 
       <CaseActions
         isResolved={caseItem.status === "Resolved"}
+        needsVote={caseItem.needsVote}
         decision={caseItem.decision}
         blockchainCaseId={caseItem.blockchainCaseId}
         supabaseCaseId={caseItem.id}
         moderatorAddress={moderatorAddress}
         onVoteSuccess={onVoteSuccess}
+        onVoteRecordedOnChain={onVoteRecordedOnChain}
       />
     </aside>
   );

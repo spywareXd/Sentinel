@@ -16,14 +16,14 @@ const SENTINEL_ABI = [
     type: "function",
   },
   {
+    anonymous: false,
     inputs: [
-      { internalType: "uint256", name: "_caseId", type: "uint256" },
-      { internalType: "address", name: "_moderator", type: "address" },
+      { indexed: true, internalType: "uint256", name: "caseId", type: "uint256" },
+      { indexed: true, internalType: "address", name: "moderator", type: "address" },
+      { indexed: false, internalType: "uint8", name: "decision", type: "uint8" },
     ],
-    name: "getVote",
-    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
-    stateMutability: "view",
-    type: "function",
+    name: "VoteCast",
+    type: "event",
   },
 ] as const;
 
@@ -41,6 +41,7 @@ export type VoteStatus =
   | "awaiting_approval"
   | "pending"
   | "syncing"
+  | "recorded_on_chain"
   | "success"
   | "error";
 
@@ -160,6 +161,55 @@ const syncVoteToBackend = async (payload: {
   throw new Error(lastFailure);
 };
 
+const hasVoteCastEventInReceipt = (
+  contract: Contract,
+  receipt: {
+    logs?: Array<{ topics: readonly string[]; data: string }>;
+  } | null,
+  blockchainCaseId: number,
+  moderatorAddress: string,
+  voteCode: number
+) => {
+  if (!receipt?.logs?.length) {
+    return false;
+  }
+
+  const expectedModeratorAddress = moderatorAddress.toLowerCase();
+
+  for (const log of receipt.logs) {
+    try {
+      const parsedLog = contract.interface.parseLog({
+        topics: [...log.topics],
+        data: log.data,
+      });
+
+      if (!parsedLog || parsedLog.name !== "VoteCast") {
+        continue;
+      }
+
+      const parsedCaseId = Number(parsedLog.args.caseId ?? parsedLog.args[0]);
+      const parsedModerator = String(
+        parsedLog.args.moderator ?? parsedLog.args[1]
+      ).toLowerCase();
+      const parsedDecision = Number(
+        parsedLog.args.decision ?? parsedLog.args[2]
+      );
+
+      if (
+        parsedCaseId === blockchainCaseId &&
+        parsedModerator === expectedModeratorAddress &&
+        parsedDecision === voteCode
+      ) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return false;
+};
+
 /**
  * Hook that drives the full MetaMask vote flow:
  * 1. Connects MetaMask
@@ -186,7 +236,12 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
     moderatorAddress: string
   ) => {
     // --- 0. Prevent parallel calls ---
-    if (status !== "idle" && status !== "success" && status !== "error") {
+    if (
+      status !== "idle" &&
+      status !== "success" &&
+      status !== "recorded_on_chain" &&
+      status !== "error"
+    ) {
       return;
     }
 
@@ -263,16 +318,36 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
       setStatus("pending");
 
       // --- 5. Wait for confirmation ---
-      await tx.wait(1);
+      const receipt = await tx.wait(1);
 
       // --- 6. Sync result to backend ---
       setStatus("syncing");
-      await syncVoteToBackend({
-        case_id: supabaseCaseId,
-        moderator_address: signerAddress,
-        vote: voteCode,
-        tx_hash: tx.hash,
-      });
+      try {
+        await syncVoteToBackend({
+          case_id: supabaseCaseId,
+          moderator_address: signerAddress,
+          vote: voteCode,
+          tx_hash: tx.hash,
+        });
+      } catch (syncErr: unknown) {
+        const syncErrorMessage =
+          syncErr instanceof Error ? syncErr.message : String(syncErr);
+        const voteRecordedOnChain = hasVoteCastEventInReceipt(
+          contract,
+          receipt,
+          blockchainCaseId,
+          signerAddress,
+          voteCode
+        );
+
+        if (voteRecordedOnChain) {
+          setError(syncErrorMessage);
+          setStatus("recorded_on_chain");
+          return;
+        }
+
+        throw syncErr;
+      }
 
       setStatus("success");
     } catch (err: unknown) {
