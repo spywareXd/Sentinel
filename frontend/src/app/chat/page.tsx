@@ -29,6 +29,27 @@ const findLatestPunishment = (rows: UserPunishment[] | null | undefined) =>
       return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
     })[0] ?? null;
 
+const BLOCKING_PUNISHMENT_TYPES = new Set([
+  "timeout",
+  "mute",
+  "ban",
+  "restricted",
+  "suspension",
+  "kick",
+]);
+
+const formatPunishmentLabel = (punishmentType?: string | null) => {
+  const normalized = punishmentType?.trim();
+  if (!normalized) return "Punishment Active";
+
+  return `${normalized
+    .replace(/[_-]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")} Active`;
+};
+
 export default function Home() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -36,7 +57,6 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // The logged-in user's info, fetched from Supabase auth + profiles
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("You");
   const [walletAddress, setWalletAddress] = useState<string>("");
@@ -45,21 +65,31 @@ export default function Home() {
   const [acknowledgedPunishmentId, setAcknowledgedPunishmentId] = useState<string | null>(null);
   const [countdownNowMs, setCountdownNowMs] = useState<number>(() => Date.now());
 
-  const punishmentBanner = activePunishment
+  const hasActivePunishment =
+    activePunishment !== null && isActivePunishment(activePunishment);
+  const punishmentBanner = hasActivePunishment && activePunishment
     ? `${activePunishment.punishment_type.replace(/[_-]+/g, " ")}${
-        activePunishment.reason ? ` • ${activePunishment.reason}` : ""
+        activePunishment.reason ? ` - ${activePunishment.reason}` : ""
       }`
     : null;
   const blocksMessaging =
+    hasActivePunishment &&
     activePunishment !== null &&
-    ["timeout", "mute", "ban", "restricted", "suspension", "kick"].includes(
-      activePunishment.punishment_type.toLowerCase(),
-    );
+    BLOCKING_PUNISHMENT_TYPES.has(activePunishment.punishment_type.toLowerCase());
   const shouldShowPunishmentPopout =
-    activePunishment !== null && acknowledgedPunishmentId !== activePunishment.id;
-  const timeoutReason = activePunishment?.reason?.trim() || "No reason was provided.";
+    hasActivePunishment &&
+    activePunishment !== null &&
+    acknowledgedPunishmentId !== activePunishment.id;
+  const timeoutReason =
+    hasActivePunishment && activePunishment?.reason?.trim()
+      ? activePunishment.reason.trim()
+      : "No reason was provided.";
+  const punishmentStatusLabel =
+    hasActivePunishment && activePunishment
+      ? formatPunishmentLabel(activePunishment.punishment_type)
+      : "Punishment Active";
   const timeoutCountdown = useMemo(() => {
-    if (!activePunishment) return null;
+    if (!activePunishment || !hasActivePunishment) return null;
 
     const expiresAt = getPunishmentExpiry(activePunishment);
     if (!expiresAt) return null;
@@ -77,7 +107,7 @@ export default function Home() {
     const ss = String(seconds).padStart(2, "0");
 
     return hours > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
-  }, [activePunishment, countdownNowMs]);
+  }, [activePunishment, countdownNowMs, hasActivePunishment]);
 
   const fetchActivePunishment = async (
     currentUserId: string,
@@ -139,20 +169,20 @@ export default function Home() {
     return byWalletPunishment ?? null;
   };
 
-  // 1. Get the logged-in user's session and profile on mount
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
 
       if (error || !user) {
-        // Not logged in — redirect to login
         router.push("/login");
         return;
       }
 
       setUserId(user.id);
 
-      // Fetch their profile (username + wallet_address)
       const { data: profile } = await supabase
         .from("profiles")
         .select("username, wallet_address")
@@ -188,7 +218,7 @@ export default function Home() {
       }
     };
 
-    getUser();
+    void getUser();
   }, [router, supabase]);
 
   useEffect(() => {
@@ -226,7 +256,7 @@ export default function Home() {
   }, [supabase, userId, walletAddress]);
 
   useEffect(() => {
-    if (!activePunishment) return;
+    if (!activePunishment || !hasActivePunishment) return;
 
     const expiresAt = getPunishmentExpiry(activePunishment);
     if (!expiresAt) return;
@@ -245,10 +275,10 @@ export default function Home() {
     }, Math.max(0, expiresAt.getTime() - Date.now()) + 250);
 
     return () => window.clearTimeout(timeout);
-  }, [activePunishment]);
+  }, [activePunishment, hasActivePunishment, supabase]);
 
   useEffect(() => {
-    if (!activePunishment) return;
+    if (!activePunishment || !hasActivePunishment) return;
 
     const expiresAt = getPunishmentExpiry(activePunishment);
     if (!expiresAt) return;
@@ -258,11 +288,15 @@ export default function Home() {
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [activePunishment]);
+  }, [activePunishment, hasActivePunishment]);
 
-  // 2. Fetch historical messages + listen for realtime inserts
   useEffect(() => {
-    if (!userId) return; // Wait until we know who the user is
+    if (hasActivePunishment) return;
+    setAcknowledgedPunishmentId(null);
+  }, [hasActivePunishment]);
+
+  useEffect(() => {
+    if (!userId) return;
 
     const fetchMessages = async () => {
       const { data: messagesData, error: messagesError } = await supabase
@@ -276,15 +310,20 @@ export default function Home() {
       }
 
       if (messagesData && messagesData.length > 0) {
-        // Fetch all profiles to map usernames
         const { data: profilesData } = await supabase
           .from("profiles")
           .select("id, username");
         const profileMap = new Map(
-          profilesData?.map((p: { id: string; username: string | null }) => [p.id, p.username]) || []
+          profilesData?.map((p: { id: string; username: string | null }) => [p.id, p.username]) || [],
         );
 
-        const formatted: Message[] = messagesData.map((msg: { id: string | number; user_id: string; created_at: string; content: string; flagged?: boolean | null }) => {
+        const formatted: Message[] = messagesData.map((msg: {
+          id: string | number;
+          user_id: string;
+          created_at: string;
+          content: string;
+          flagged?: boolean | null;
+        }) => {
           const msgUsername = profileMap.get(msg.user_id) || "Unknown User";
           return {
             id: String(msg.id),
@@ -303,20 +342,26 @@ export default function Home() {
       }
     };
 
-    fetchMessages();
+    void fetchMessages();
 
-    // Realtime subscription for new messages
     const subscription = supabase
       .channel("messages_changes")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
-        async (payload: { new: { id: string | number; user_id: string; created_at: string; content: string; flagged?: boolean | null } }) => {
+        async (payload: {
+          new: {
+            id: string | number;
+            user_id: string;
+            created_at: string;
+            content: string;
+            flagged?: boolean | null;
+          };
+        }) => {
           const newMsg = payload.new;
 
-          // Skip if we already have this message (from optimistic update)
           setMessages((current) => {
-            if (current.some((m) => m.id === String(newMsg.id))) return current;
+            if (current.some((message) => message.id === String(newMsg.id))) return current;
             return current;
           });
 
@@ -342,10 +387,10 @@ export default function Home() {
           };
 
           setMessages((prev) => {
-            if (prev.some((m) => m.id === formattedNew.id)) return prev;
+            if (prev.some((message) => message.id === formattedNew.id)) return prev;
             return [...prev, formattedNew];
           });
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -395,7 +440,6 @@ export default function Home() {
       return;
     }
 
-    // Optimistically update the UI
     if (insertedMsg) {
       const formattedOptimistic: Message = {
         id: insertedMsg.id,
@@ -409,7 +453,7 @@ export default function Home() {
         tone: "self",
       };
       setMessages((prev) => {
-        if (prev.some((m) => m.id === formattedOptimistic.id)) return prev;
+        if (prev.some((message) => message.id === formattedOptimistic.id)) return prev;
         return [...prev, formattedOptimistic];
       });
     }
@@ -421,7 +465,7 @@ export default function Home() {
       .delete()
       .eq("id", messageId);
     if (!error) {
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setMessages((prev) => prev.filter((message) => message.id !== messageId));
     }
   };
 
@@ -451,7 +495,7 @@ export default function Home() {
             {punishmentBanner && (
               <div className="relative mx-6 mt-4 rounded-2xl border border-[rgba(255,124,124,0.42)] bg-[rgba(255,82,82,0.05)] pl-5 py-3 pr-28 text-sm text-[#ffcdc7] shadow-[0_10px_24px_rgba(255,72,72,0.12)] backdrop-blur-lg backdrop-saturate-200 backdrop-brightness-125">
                 <span className="font-bold uppercase tracking-[0.18em] text-[12px] text-[#ffb4ab]">
-                  Timeout Active
+                  {punishmentStatusLabel}
                 </span>
                 <p className="mt-1 leading-6">{timeoutReason}</p>
                 {timeoutCountdown && (
@@ -469,11 +513,7 @@ export default function Home() {
             <Composer
               onSend={handleSend}
               disabled={blocksMessaging}
-              disabledReason={
-                blocksMessaging
-                  ? timeoutReason
-                  : null
-              }
+              disabledReason={blocksMessaging ? timeoutReason : null}
             />
           </div>
           <RightRail roomDetails={roomDetails} roomMembers={participants} />
