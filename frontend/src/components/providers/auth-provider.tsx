@@ -9,6 +9,7 @@ type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,22 +20,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [supabase] = useState(() => createClient());
 
-  useEffect(() => {
-    const getInitialSession = async () => {
-      try {
-        const {
-          data: { session: initialSession },
-        } = await supabase.auth.getSession();
-        setSession(initialSession);
-        setUser(initialSession?.user ?? null);
-      } catch (error) {
-        console.error("Error getting session:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const refreshSession = async () => {
+    setIsLoading(true);
+    try {
+      const {
+        data: { session: currentSession },
+      } = await supabase.auth.getSession();
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+    } catch (error) {
+      console.error("Error refreshing session:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    getInitialSession();
+  useEffect(() => {
+    refreshSession();
 
     const {
       data: { subscription },
@@ -57,8 +59,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, isLoading, signOut }}>
+    <AuthContext.Provider value={{ session, user, isLoading, signOut, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );
 }
+

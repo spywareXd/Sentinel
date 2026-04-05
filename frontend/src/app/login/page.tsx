@@ -1,18 +1,20 @@
-﻿'use client';
+'use client';
 
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, QrCode, UserRound, Wallet } from 'lucide-react';
 import { login } from '@/app/actions/auth';
+import { useAuth } from '@/hooks/use-auth';
 
 function LoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refreshSession } = useAuth();
 
   const message = searchParams.get('message');
   const redirectTo = searchParams.get('redirectTo') || '/chat';
@@ -29,6 +31,7 @@ function LoginContent() {
       return;
     }
 
+    await refreshSession();
     router.replace(redirectTo);
   };
 
