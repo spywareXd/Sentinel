@@ -5,6 +5,7 @@ export type ActivityRecord = {
   title: string;
   punishmentType: string;
   status: ActivityStatus;
+  issuedAtTimestamp: number;
   issuedAt: string;
   expiresAt: string;
   durationLabel: string;

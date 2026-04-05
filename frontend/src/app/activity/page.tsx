@@ -74,6 +74,19 @@ const getIssuedTimestamp = (punishment: Pick<UserPunishment, "issued_at">) => {
 const sortPunishments = (rows: UserPunishment[] | null | undefined) =>
   [...(rows ?? [])].sort((left, right) => getIssuedTimestamp(right) - getIssuedTimestamp(left));
 
+const mergePunishmentRows = (
+  ...groups: Array<UserPunishment[] | null | undefined>
+): UserPunishment[] => {
+  const byId = new Map<string, UserPunishment>();
+
+  for (const punishment of groups.flatMap((group) => group ?? [])) {
+    if (!punishment?.id) continue;
+    byId.set(punishment.id, punishment);
+  }
+
+  return sortPunishments([...byId.values()]);
+};
+
 const applyInactiveState = (punishments: UserPunishment[] | null | undefined, punishmentIds: string[]) => {
   if (!punishmentIds.length) return [...(punishments ?? [])];
 
@@ -94,6 +107,7 @@ const mapActivityRecord = (punishment: UserPunishment): ActivityRecord => {
     title: `${typeLabel} Record`,
     punishmentType: typeLabel,
     status: isActive ? "Active" : "Expired",
+    issuedAtTimestamp: getIssuedTimestamp(punishment),
     issuedAt: formatTimestamp(punishment.issued_at),
     expiresAt: formatTimestamp(getPunishmentExpiry(punishment)?.toISOString()),
     durationLabel: formatDuration(punishment),
@@ -163,11 +177,10 @@ export default function ActivityPage() {
         console.error("Error loading activity by user_id:", byUserResult.error);
       }
 
-      let punishments = await deactivateExpiredPunishments(
-        sortPunishments(byUserResult.data as UserPunishment[] | null),
-      );
+      const byUserRows = (byUserResult.data as UserPunishment[] | null) ?? [];
+      let byWalletRows: UserPunishment[] = [];
 
-      if (!punishments.length && normalizedWallet) {
+      if (normalizedWallet) {
         const byWalletResult = await supabase
           .from("user_punishments")
           .select("*")
@@ -179,11 +192,13 @@ export default function ActivityPage() {
         if (byWalletResult.error) {
           console.error("Error loading activity by wallet_address:", byWalletResult.error);
         } else {
-          punishments = await deactivateExpiredPunishments(
-            sortPunishments(byWalletResult.data as UserPunishment[] | null),
-          );
+          byWalletRows = (byWalletResult.data as UserPunishment[] | null) ?? [];
         }
       }
+
+      const punishments = await deactivateExpiredPunishments(
+        mergePunishmentRows(byUserRows, byWalletRows),
+      );
 
       if (!punishments.length && byUserResult.error) {
         setRecords([]);
@@ -192,7 +207,9 @@ export default function ActivityPage() {
         return;
       }
 
-      const mappedRecords = punishments.map(mapActivityRecord);
+      const mappedRecords = punishments
+        .map(mapActivityRecord)
+        .sort((left, right) => right.issuedAtTimestamp - left.issuedAtTimestamp);
       setRecords(mappedRecords);
       setSelectedActivityId((current) => current ?? mappedRecords[0]?.id ?? null);
       setIsLoading(false);
@@ -226,14 +243,38 @@ export default function ActivityPage() {
             filter: `user_id=eq.${user.id}`,
           },
           async () => {
-            const { data, error } = await supabase
+            const { data: byUserData, error } = await supabase
               .from("user_punishments")
               .select("*")
               .eq("user_id", user.id)
               .order("issued_at", { ascending: false });
 
             if (error || isCancelled) return;
-            const punishments = sortPunishments((data ?? []) as UserPunishment[]);
+            let byWalletRows: UserPunishment[] = [];
+
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("wallet_address")
+              .eq("id", user.id)
+              .maybeSingle();
+
+            const normalizedWallet = normalizeWalletAddress(profile?.wallet_address);
+            if (normalizedWallet) {
+              const { data: byWalletData, error: walletError } = await supabase
+                .from("user_punishments")
+                .select("*")
+                .eq("wallet_address", normalizedWallet)
+                .order("issued_at", { ascending: false });
+
+              if (!walletError) {
+                byWalletRows = (byWalletData ?? []) as UserPunishment[];
+              }
+            }
+
+            const punishments = mergePunishmentRows(
+              (byUserData ?? []) as UserPunishment[],
+              byWalletRows,
+            );
             const expiredIds = getExpiredActivePunishmentIds(punishments);
 
             if (expiredIds.length) {
@@ -248,7 +289,8 @@ export default function ActivityPage() {
             }
 
             const mappedRecords = applyInactiveState(punishments, expiredIds)
-              .map(mapActivityRecord);
+              .map(mapActivityRecord)
+              .sort((left, right) => right.issuedAtTimestamp - left.issuedAtTimestamp);
             setRecords(mappedRecords);
           },
         )

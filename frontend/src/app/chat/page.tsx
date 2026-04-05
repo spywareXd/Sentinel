@@ -29,6 +29,37 @@ const findLatestPunishment = (rows: UserPunishment[] | null | undefined) =>
       return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
     })[0] ?? null;
 
+const mergePunishmentRows = (
+  ...groups: Array<UserPunishment[] | null | undefined>
+): UserPunishment[] => {
+  const byId = new Map<string, UserPunishment>();
+
+  for (const punishment of groups.flatMap((group) => group ?? [])) {
+    if (!punishment?.id) continue;
+    byId.set(punishment.id, punishment);
+  }
+
+  return [...byId.values()].sort((left, right) => {
+    const leftTime = new Date(left.issued_at).getTime();
+    const rightTime = new Date(right.issued_at).getTime();
+    return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
+  });
+};
+
+const applyInactiveState = (
+  punishments: UserPunishment[] | null | undefined,
+  punishmentIds: string[],
+) => {
+  if (!punishmentIds.length) return [...(punishments ?? [])];
+
+  const expiredIds = new Set(punishmentIds);
+  return [...(punishments ?? [])].map((punishment) =>
+    expiredIds.has(punishment.id)
+      ? { ...punishment, is_active: false }
+      : punishment,
+  );
+};
+
 const BLOCKING_PUNISHMENT_TYPES = new Set([
   "timeout",
   "mute",
@@ -116,7 +147,7 @@ export default function Home() {
     const normalizedWallet = normalizeWalletAddress(currentWalletAddress);
     const deactivatePunishments = async (punishments: UserPunishment[] | null | undefined) => {
       const expiredIds = getExpiredActivePunishmentIds(punishments);
-      if (!expiredIds.length) return;
+      if (!expiredIds.length) return applyInactiveState(punishments, []);
 
       const { error } = await supabase
         .from("user_punishments")
@@ -126,47 +157,45 @@ export default function Home() {
       if (error) {
         console.error("Error deactivating expired punishments:", error);
       }
+      return applyInactiveState(punishments, expiredIds);
     };
 
     const byUserResult = await supabase
       .from("user_punishments")
       .select("*")
       .eq("user_id", currentUserId)
-      .eq("is_active", true)
       .order("issued_at", { ascending: false });
 
     if (byUserResult.error) {
-      console.error("Error loading active punishment by user_id:", byUserResult.error);
+      console.error("Error loading punishments by user_id:", byUserResult.error);
     }
 
     const byUserRows = (byUserResult.data as UserPunishment[] | null) ?? [];
-    await deactivatePunishments(byUserRows);
-    const byUserPunishment = findLatestPunishment(byUserRows.filter(isActivePunishment));
-    if (byUserPunishment) {
-      return byUserPunishment;
+    let byWalletRows: UserPunishment[] = [];
+
+    if (normalizedWallet) {
+      const byWalletResult = await supabase
+        .from("user_punishments")
+        .select("*")
+        .eq("wallet_address", normalizedWallet)
+        .order("issued_at", { ascending: false });
+
+      if (byWalletResult.error) {
+        console.error("Error loading punishments by wallet_address:", byWalletResult.error);
+      } else {
+        byWalletRows = (byWalletResult.data as UserPunishment[] | null) ?? [];
+      }
     }
 
-    if (!normalizedWallet) {
+    const combinedRows = mergePunishmentRows(byUserRows, byWalletRows);
+    const normalizedRows = await deactivatePunishments(combinedRows);
+    const latestPunishment = findLatestPunishment(normalizedRows);
+
+    if (!latestPunishment) {
       return null;
     }
 
-    const byWalletResult = await supabase
-      .from("user_punishments")
-      .select("*")
-      .eq("wallet_address", normalizedWallet)
-      .eq("is_active", true)
-      .order("issued_at", { ascending: false });
-
-    if (byWalletResult.error) {
-      console.error("Error loading active punishment by wallet_address:", byWalletResult.error);
-      return null;
-    }
-
-    const byWalletRows = (byWalletResult.data as UserPunishment[] | null) ?? [];
-    await deactivatePunishments(byWalletRows);
-    const byWalletPunishment = findLatestPunishment(byWalletRows.filter(isActivePunishment));
-
-    return byWalletPunishment ?? null;
+    return isActivePunishment(latestPunishment) ? latestPunishment : null;
   };
 
   useEffect(() => {

@@ -208,7 +208,7 @@ export default function MetaMaskVoteModal({
             </p>
             {status === "recorded_on_chain" && error && (
               <p className="mt-2 text-xs text-[var(--on-surface-variant)]">
-                Backend sync detail: {error}
+                Detail: {error}
               </p>
             )}
           </div>

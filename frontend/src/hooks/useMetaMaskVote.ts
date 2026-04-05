@@ -16,6 +16,16 @@ const SENTINEL_ABI = [
     type: "function",
   },
   {
+    inputs: [
+      { internalType: "uint256", name: "_caseId", type: "uint256" },
+      { internalType: "address", name: "_moderator", type: "address" },
+    ],
+    name: "getVote",
+    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     anonymous: false,
     inputs: [
       { indexed: true, internalType: "uint256", name: "caseId", type: "uint256" },
@@ -210,6 +220,24 @@ const hasVoteCastEventInReceipt = (
   return false;
 };
 
+const hasRecordedVoteForModerator = async (
+  contract: Contract,
+  blockchainCaseId: number,
+  moderatorAddress: string,
+) => {
+  try {
+    const recordedVote = await contract.getVote(
+      BigInt(blockchainCaseId),
+      moderatorAddress,
+    );
+
+    return Number(recordedVote) > 0;
+  } catch (err) {
+    console.error("Could not verify already-recorded vote:", err);
+    return false;
+  }
+};
+
 /**
  * Hook that drives the full MetaMask vote flow:
  * 1. Connects MetaMask
@@ -235,6 +263,9 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
     vote: VoteOption,
     moderatorAddress: string
   ) => {
+    let contract: Contract | null = null;
+    let signerAddress = "";
+
     // --- 0. Prevent parallel calls ---
     if (
       status !== "idle" &&
@@ -297,9 +328,9 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
 
       // Re-get provider after potential network switch
       const signer = await new BrowserProvider(window.ethereum).getSigner();
-      const signerAddress = (await signer.getAddress()).toLowerCase();
+      signerAddress = (await signer.getAddress()).toLowerCase();
       const expectedModeratorAddress = moderatorAddress.toLowerCase();
-      const contract = new Contract(CONTRACT_ADDRESS, SENTINEL_ABI, signer);
+      contract = new Contract(CONTRACT_ADDRESS, SENTINEL_ABI, signer);
 
       if (expectedModeratorAddress && signerAddress !== expectedModeratorAddress) {
         console.warn(
@@ -356,6 +387,20 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
       const errorMessage = err instanceof Error ? err.message : String(err);
       const errorCode = (err as { code?: number | string })?.code;
       const shortMessage = (err as { shortMessage?: string })?.shortMessage;
+      const combinedMessage = `${shortMessage ?? ""} ${errorMessage ?? ""}`.toLowerCase();
+
+      if (
+        contract &&
+        signerAddress &&
+        /already voted/.test(combinedMessage) &&
+        (await hasRecordedVoteForModerator(contract, blockchainCaseId, signerAddress))
+      ) {
+        setError(
+          "This wallet already has a recorded on-chain vote for this case. Moving it to history locally while Sentinel catches up.",
+        );
+        setStatus("recorded_on_chain");
+        return;
+      }
 
       if (errorCode === 4001 || errorCode === "ACTION_REJECTED") {
         setError("You rejected the transaction in MetaMask.");

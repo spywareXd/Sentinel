@@ -49,10 +49,14 @@ export default function ActivityList({
   selectedActivityId,
   onSelectActivity,
 }: ActivityListProps) {
+  const sortedRecords = [...records].sort(
+    (left, right) => right.issuedAtTimestamp - left.issuedAtTimestamp,
+  );
+
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
-        {records.map((record) => {
+        {sortedRecords.map((record) => {
           const key = record.punishmentType.toLowerCase();
           const style =
             punishmentStyles[key as keyof typeof punishmentStyles] ?? punishmentStyles.default;
