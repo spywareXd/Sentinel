@@ -13,11 +13,10 @@ import {
   isActivePunishment,
   splitPunishmentReason,
 } from "@/utils/punishment";
+import { resolveUserWalletAddress } from "@/utils/account";
 import type { ActivityRecord } from "@/types/activity";
 import type { UserPunishment } from "@/types/database/userPunishment";
 import { createClient } from "@/utils/supabase/client";
-
-const normalizeWalletAddress = (value?: string | null) => value?.trim().toLowerCase() || "";
 
 const formatPunishmentType = (value: string) =>
   value
@@ -158,13 +157,7 @@ export default function ActivityPage() {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("wallet_address")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      const normalizedWallet = normalizeWalletAddress(profile?.wallet_address);
+      const normalizedWallet = await resolveUserWalletAddress(supabase, user);
 
       const byUserResult = await supabase
         .from("user_punishments")
@@ -253,13 +246,7 @@ export default function ActivityPage() {
             if (error || isCancelled) return;
             let byWalletRows: UserPunishment[] = [];
 
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("wallet_address")
-              .eq("id", user.id)
-              .maybeSingle();
-
-            const normalizedWallet = normalizeWalletAddress(profile?.wallet_address);
+            const normalizedWallet = await resolveUserWalletAddress(supabase, user);
             if (normalizedWallet) {
               const { data: byWalletData, error: walletError } = await supabase
                 .from("user_punishments")

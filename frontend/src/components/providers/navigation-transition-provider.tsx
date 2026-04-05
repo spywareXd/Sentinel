@@ -17,7 +17,7 @@ type NavigationTransitionContextValue = {
   startNavigation: (href: string) => void;
 };
 
-const MIN_TRANSITION_MS = 350;
+const MIN_TRANSITION_MS = 150;
 const MAX_TRANSITION_MS = 6000;
 
 export const NavigationTransitionContext =

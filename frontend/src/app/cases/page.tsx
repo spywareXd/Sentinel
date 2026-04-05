@@ -8,6 +8,7 @@ import CaseList from "@/components/cases/CaseList";
 import CasesSummaryStrip from "@/components/cases/CasesSummaryStrip";
 import Sidebar from "@/components/layout/Sidebar";
 import type { CaseDecision, CaseRecord } from "@/types/mockdata/cases";
+import { resolveUserWalletAddress } from "@/utils/account";
 import { createClient } from "@/utils/supabase/client";
 
 type TopTab = "Assigned" | "History";
@@ -495,20 +496,13 @@ export default function CasesPage() {
           return;
         }
 
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("wallet_address")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        const walletAddress = (
-          profile?.wallet_address ||
-          user.user_metadata?.wallet_address ||
-          ""
-        ).toLowerCase();
+        const walletAddress = await resolveUserWalletAddress(supabase, user);
         setModeratorWallet(walletAddress);
 
         if (!walletAddress) {
+          setLoadError(
+            "No wallet address is associated with this account yet, so assigned moderation cases cannot be matched.",
+          );
           setCases([]);
           setSelectedCaseId(null);
           return;

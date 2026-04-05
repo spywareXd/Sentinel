@@ -19,9 +19,8 @@ import { roomDetails } from "@/mockdata/room";
 import type { UserPunishment } from "@/types/database/userPunishment";
 import type { Message } from "@/types/mockdata/chat";
 import type { RoomMember } from "@/types/mockdata/room";
+import { normalizeWalletAddress, resolveUserWalletAddress } from "@/utils/account";
 import { createClient } from "@/utils/supabase/client";
-
-const normalizeWalletAddress = (value?: string | null) => value?.trim().toLowerCase() || "";
 
 const findLatestPunishment = (rows: UserPunishment[] | null | undefined) =>
   [...(rows ?? [])]
@@ -229,12 +228,18 @@ function ChatPageContent() {
           .eq("id", user.id)
           .single();
 
+        const resolvedWalletAddress = await resolveUserWalletAddress(supabase, user);
+
         if (profile) {
           setUsername(profile.username || user.email || "You");
-          setWalletAddress(profile.wallet_address || "");
+          setWalletAddress(resolvedWalletAddress);
         }
 
-        const punishment = await fetchActivePunishment(user.id, profile?.wallet_address);
+        if (!profile) {
+          setWalletAddress(resolvedWalletAddress);
+        }
+
+        const punishment = await fetchActivePunishment(user.id, resolvedWalletAddress);
         setActivePunishment(punishment);
 
         const { data: profiles } = await supabase
