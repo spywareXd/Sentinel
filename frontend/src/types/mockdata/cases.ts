@@ -7,6 +7,7 @@ export type CaseDecision = "Punished" | "Dismissed" | null;
 export type CaseRecord = {
   id: string;
   number: string;
+  createdAtTimestamp: number;
   title: string;
   category: string;
   severity: CaseSeverity;

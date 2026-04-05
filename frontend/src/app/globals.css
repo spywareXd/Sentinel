@@ -19,6 +19,10 @@
   --secondary-container: #00a6e0;
   --tertiary: #ffb783;
   --tertiary-container: #d97721;
+  --error: #ff7a7a;
+  --error-container: #7f1d1d;
+  --on-error: #210001;
+  --on-error-container: #ffd7d7;
 
   --on-surface: #dae2fd;
   --on-surface-variant: #c7c4d7;

@@ -19,7 +19,7 @@ export default function CaseDetailPanel({
   return (
     <aside
       id="cases-details-top"
-      className="sticky top-24 flex h-[calc(100vh-8rem)] flex-col gap-6 rounded-[1.75rem] border border-[color:color-mix(in_srgb,var(--outline-variant)_25%,transparent)] bg-[color:color-mix(in_srgb,var(--surface-container-highest)_45%,transparent)] p-6 backdrop-blur-xl"
+      className="flex h-full max-h-[calc(100vh-8rem)] min-h-0 flex-col gap-6 rounded-[1.75rem] border border-[color:color-mix(in_srgb,var(--outline-variant)_25%,transparent)] bg-[color:color-mix(in_srgb,var(--surface-container-highest)_45%,transparent)] p-6 backdrop-blur-xl"
     >
       <CaseDetailHeader caseItem={caseItem} />
 
