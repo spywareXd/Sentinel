@@ -10,11 +10,6 @@ import Sidebar from "@/components/layout/Sidebar";
 import type { CaseDecision, CaseRecord } from "@/types/mockdata/cases";
 import { createClient } from "@/utils/supabase/client";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
-const LOCAL_BACKEND_URL = "http://localhost:8000";
-const BACKEND_CANDIDATES =
-  BACKEND_URL === LOCAL_BACKEND_URL ? [BACKEND_URL] : [BACKEND_URL, LOCAL_BACKEND_URL];
-
 type TopTab = "Assigned" | "History";
 
 const toTitleCase = (value: string) =>
@@ -26,8 +21,8 @@ const toTitleCase = (value: string) =>
     .join(" ");
 
 const getSeverity = (harmfulScore: number, severeScore: number) => {
-  if (severeScore >= 0.75 || harmfulScore >= 0.8) return "High";
-  if (severeScore >= 0.45 || harmfulScore >= 0.5) return "Medium";
+  if (severeScore >= 0.75 || harmfulScore >= 0.75) return "High";
+  if (severeScore >= 0.4 || harmfulScore >= 0.4) return "Medium";
   return "Low";
 };
 
@@ -43,6 +38,13 @@ const formatTimestamp = (value?: string | null) => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+const getTimestamp = (value?: string | null) => {
+  if (!value) return 0;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 };
 
 const mapDecision = (decision?: string | null): CaseDecision => {
@@ -96,6 +98,7 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
       dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
         ? `#${dbCase.blockchain_case_id}`
         : `#${String(dbCase.id).slice(0, 6).toUpperCase()}`,
+    createdAtTimestamp: getTimestamp(dbCase.created_at),
     title: toTitleCase(reason),
     category: toTitleCase(reason),
     severity: getSeverity(harmfulScore, severeScore),
@@ -143,7 +146,6 @@ export default function CasesPage() {
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [activeTopTab, setActiveTopTab] = useState<TopTab>("Assigned");
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [isDetailDismissed, setIsDetailDismissed] = useState(false);
   const [searchQuery] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
@@ -173,28 +175,15 @@ export default function CasesPage() {
         if (left.status !== "Resolved" && right.status === "Resolved") return -1;
         if (left.assignedToMe && !right.assignedToMe) return -1;
         if (!left.assignedToMe && right.assignedToMe) return 1;
-        return right.harmfulScore - left.harmfulScore;
+        return right.createdAtTimestamp - left.createdAtTimestamp;
       });
   }, [cases, activeTopTab, searchQuery]);
-
-  // Syncing state when filteredCases changes via useEffect to avoid render-body state updates
-  useEffect(() => {
-    if (filteredCases.length === 0) {
-      if (selectedCaseId !== null) setSelectedCaseId(null);
-    } else {
-      const hasSelected = filteredCases.some((c) => c.id === selectedCaseId);
-      if (!selectedCaseId || !hasSelected) {
-        if (selectedCaseId !== filteredCases[0].id) {
-          setSelectedCaseId(filteredCases[0].id);
-        }
-      }
-    }
-  }, [filteredCases, selectedCaseId]);
 
   const selectedCase =
     (selectedCaseId
       ? filteredCases.find((caseItem) => caseItem.id === selectedCaseId)
       : null) ??
+    filteredCases[0] ??
     null;
 
   const summary = useMemo(
@@ -238,44 +227,32 @@ export default function CasesPage() {
           return;
         }
 
-        let payload: { cases?: DbCase[] } | null = null;
-        let lastFailure: unknown = null;
+        const { data, error } = await supabase
+          .from("moderation_cases")
+          .select(
+            "id, blockchain_case_id, decision, status, created_at, toxicity_score, ai_reason, punishment_type, punishment_duration, tx_hash, messages:message_id(content), offender:offender_id(username, wallet_address)"
+          )
+          .or(
+            `moderator_1.eq.${walletAddress},moderator_2.eq.${walletAddress},moderator_3.eq.${walletAddress}`
+          )
+          .order("created_at", { ascending: false });
 
-        for (const baseUrl of BACKEND_CANDIDATES) {
-          try {
-            const resp = await fetch(
-              `${baseUrl}/moderation/my-cases?wallet_address=${encodeURIComponent(walletAddress)}`,
-              {
-                cache: "no-store",
-                headers: {
-                  "bypass-tunnel-reminder": "true",
-                },
-              },
-            );
-
-            if (!resp.ok) {
-              lastFailure = await resp.text().catch(() => `HTTP ${resp.status}`);
-              continue;
-            }
-
-            payload = (await resp.json()) as { cases?: DbCase[] };
-            break;
-          } catch (err) {
-            lastFailure = err;
-          }
-        }
-
-        if (!payload) {
-          console.error("Network error loading cases:", lastFailure);
+        if (error) {
+          console.error("Error loading cases:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
           setCases([]);
           setSelectedCaseId(null);
           return;
         }
 
-        const mappedCases = (payload.cases ?? []).map(mapCaseRecord);
+        const mappedCases = ((data ?? []) as DbCase[]).map(mapCaseRecord);
         setCases(mappedCases);
       } catch (err) {
-        console.error("Network error loading cases:", err);
+        console.error("Unexpected cases load failure:", err);
         setCases([]);
         setSelectedCaseId(null);
       } finally {
@@ -322,7 +299,6 @@ export default function CasesPage() {
         !detailPanelRef.current.contains(event.target) &&
         !event.target.closest("[data-case-list-root='true']")
       ) {
-        setIsDetailDismissed(true);
         setSelectedCaseId(null);
       }
     };
@@ -336,7 +312,6 @@ export default function CasesPage() {
 
   const resetCases = () => {
     setRefreshKey((currentKey) => currentKey + 1);
-    setIsDetailDismissed(false);
     setActiveTopTab("Assigned");
   };
 
@@ -349,12 +324,11 @@ export default function CasesPage() {
           activeTopTab={activeTopTab}
           onTopTabChange={(tab) => {
             setActiveTopTab(tab);
-            setIsDetailDismissed(false);
           }}
         />
 
-        <div className="grid min-h-0 flex-1 grid-cols-12 gap-8 overflow-y-auto p-8">
-          <div className="col-span-12 flex flex-col gap-8 xl:col-span-8">
+        <div className="grid min-h-0 flex-1 grid-cols-12 gap-8 overflow-hidden p-8">
+          <div className="premium-scrollbar col-span-12 flex min-h-0 flex-col gap-8 overflow-y-auto pr-2 xl:col-span-8">
             <section className="flex flex-col gap-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
@@ -389,15 +363,14 @@ export default function CasesPage() {
                 selectedCaseId={selectedCase?.id ?? ""}
                 onSelectCase={(caseId) => {
                   setSelectedCaseId(caseId);
-                  setIsDetailDismissed(false);
                 }}
               />
             )}
           </div>
 
-          <div className="col-span-12 xl:col-span-4">
+          <div className="col-span-12 min-h-0 xl:col-span-4">
             {selectedCase ? (
-              <div ref={detailPanelRef}>
+              <div ref={detailPanelRef} className="h-full">
                 <CaseDetailPanel
                   caseItem={selectedCase}
                   moderatorAddress={moderatorWallet}
@@ -408,8 +381,10 @@ export default function CasesPage() {
                 />
               </div>
             ) : (
-              <div className="rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
+              <div className="flex h-full items-start">
+                <div className="w-full rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
                 Select a case to inspect its moderation details.
+                </div>
               </div>
             )}
           </div>

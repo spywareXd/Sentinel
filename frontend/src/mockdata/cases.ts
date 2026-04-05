@@ -4,6 +4,7 @@ export const caseRecords: CaseRecord[] = [
   {
     id: "case-9284",
     number: "#9284",
+    createdAtTimestamp: 1726060200,
     title: "Harassment Report",
     category: "Direct Threat",
     severity: "High",
@@ -33,6 +34,7 @@ export const caseRecords: CaseRecord[] = [
   {
     id: "case-9281",
     number: "#9281",
+    createdAtTimestamp: 1726058220,
     title: "Trash-talk Dispute",
     category: "Escalated Banter",
     severity: "Low",
@@ -62,6 +64,7 @@ export const caseRecords: CaseRecord[] = [
   {
     id: "case-9270",
     number: "#9270",
+    createdAtTimestamp: 1726051800,
     title: "Hate-speech Review",
     category: "Protected Group Abuse",
     severity: "High",
@@ -92,6 +95,7 @@ export const caseRecords: CaseRecord[] = [
   {
     id: "case-9264",
     number: "#9264",
+    createdAtTimestamp: 1726060680,
     title: "Self-harm Encouragement",
     category: "Critical Harm",
     severity: "High",
@@ -121,6 +125,7 @@ export const caseRecords: CaseRecord[] = [
   {
     id: "case-9258",
     number: "#9258",
+    createdAtTimestamp: 1726037400,
     title: "Spam Flag Review",
     category: "Repeated Posting",
     severity: "Medium",
