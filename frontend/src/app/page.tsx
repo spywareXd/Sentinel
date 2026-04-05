@@ -81,7 +81,7 @@ export default function LandingPage() {
             <div className="w-48 h-48 md:w-64 md:h-64 rounded-[2rem] bg-surface-container-high border border-outline-variant/20 flex items-center justify-center backdrop-blur-xl bg-[rgba(45,52,73,0.4)] rotate-12 group-hover:rotate-[8deg] transition-all duration-700 shadow-2xl">
               <div className="w-full h-full p-8 flex items-center justify-center -rotate-12 group-hover:-rotate-[8deg] transition-all duration-700">
                 <span 
-                  className="material-symbols-outlined text-8xl md:text-[120px] text-primary group-hover:text-primary-container group-hover:drop-shadow-[0_0_40px_rgba(192,193,255,0.8)] transition-all duration-500" 
+                  className="material-symbols-outlined text-[96px] md:text-[136px] leading-none scale-[4.8] md:scale-[5.6] text-primary group-hover:text-primary-container group-hover:drop-shadow-[0_0_40px_rgba(192,193,255,0.8)] transition-all duration-500" 
                   style={{ fontVariationSettings: "'FILL' 1" }}
                 >
                   shield_with_heart
