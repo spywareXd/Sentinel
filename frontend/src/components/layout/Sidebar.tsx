@@ -1,16 +1,19 @@
-"use client";
+﻿"use client";
 
 import {
   Gavel,
   HelpCircle,
   Home,
+  LogOut,
   Settings,
   Shield,
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { useNavigationTransition } from "@/hooks/use-navigation-transition";
 import ProfileLogo from "@/components/ui/ProfileLogo";
 import { createClient } from "@/utils/supabase/client";
 
@@ -38,21 +41,60 @@ const iconMap = {
 export default function Sidebar() {
   const pathname = usePathname();
   const supabase = useMemo(() => createClient(), []);
-  const [userName, setUserName] = useState<string>("Loading...");
+  const { user, isLoading: isAuthLoading, signOut } = useAuth();
+  const { startNavigation } = useNavigationTransition();
+  const [userName, setUserName] = useState<string>("Loading..");
   const [userInitials, setUserInitials] = useState<string>("");
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data: profile } = await supabase.from('profiles').select('username').eq('id', session.user.id).single();
-        const name = profile?.username || session.user.email || "Sentinel";
-        setUserName(name);
-        setUserInitials(name.substring(0, 1).toUpperCase());
+    const fetchProfile = async () => {
+      if (!user) {
+        setUserName("Sentinel");
+        setUserInitials("");
+        return;
       }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
+
+      const metadataName =
+        typeof user.user_metadata?.username === "string"
+          ? user.user_metadata.username
+          : null;
+      const emailName = typeof user.email === "string" ? user.email.split("@")[0] : null;
+      const name = profile?.username || metadataName || emailName || "Sentinel";
+
+      setUserName(name);
+      setUserInitials(name.substring(0, 1).toUpperCase());
     };
-    fetchUser();
-  }, [supabase]);
+
+    if (!isAuthLoading) {
+      void fetchProfile();
+    }
+  }, [isAuthLoading, supabase, user]);
+
+  const displayUserName = isAuthLoading ? "Loading.." : userName;
+
+  const handleNavClick = (
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    href: string,
+  ) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    startNavigation(href);
+  };
 
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col bg-[var(--surface-container-low)] px-4 py-4 text-[var(--on-surface)]">
@@ -85,6 +127,7 @@ export default function Sidebar() {
             <Link
               key={item.label}
               href={item.href}
+              onClick={(event) => handleNavClick(event, item.href)}
               className={[
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
                 isActive
@@ -105,10 +148,19 @@ export default function Sidebar() {
           <span className="font-medium">Help</span>
         </button>
 
-        <div className="mt-4 rounded-xl bg-[var(--surface-container-high)] p-3 hover:bg-[var(--surface-container-highest)] transition-colors cursor-pointer">
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[var(--on-surface-variant)] transition-colors hover:bg-red-500/10 hover:text-red-400"
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="font-medium">Log out</span>
+        </button>
+
+        <div className="mt-4 cursor-pointer rounded-xl bg-[var(--surface-container-high)] p-3 transition-colors hover:bg-[var(--surface-container-highest)]">
           <div className="flex items-center gap-3">
             <ProfileLogo
-              name={userName}
+              name={displayUserName}
               initials={userInitials}
               className="h-10 w-10 rounded-lg object-cover"
               fallbackClassName="flex h-10 w-10 items-center justify-center rounded-lg bg-[color:color-mix(in_srgb,var(--primary)_18%,transparent)] text-sm font-bold text-[var(--primary)]"
@@ -116,7 +168,7 @@ export default function Sidebar() {
 
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--on-surface)]">
-                {userName}
+                {displayUserName}
               </p>
               <p className="truncate text-xs text-[var(--on-surface-variant)]">
                 Available

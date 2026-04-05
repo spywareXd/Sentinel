@@ -12,6 +12,7 @@ import { createClient } from "@/utils/supabase/client";
 
 type TopTab = "Assigned" | "History";
 const LOCAL_BACKEND_URL = "http://localhost:8000";
+const LOOPBACK_BACKEND_URLS = [LOCAL_BACKEND_URL, "http://127.0.0.1:8000"];
 const LOCAL_RECORDED_VOTES_KEY = "sentinel:recorded-on-chain-votes";
 const REASON_SEPARATOR = "|||";
 
@@ -28,6 +29,12 @@ const isLocalHostname = (hostname: string) =>
 const normalizeUrl = (value?: string | null) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+};
+
+const addUniqueUrl = (urls: string[], value?: string | null) => {
+  const normalized = normalizeUrl(value);
+  if (!normalized || urls.includes(normalized)) return urls;
+  return [...urls, normalized];
 };
 
 const isLoopbackUrl = (value?: string | null) => {
@@ -68,7 +75,7 @@ const getBackendCandidates = () => {
   const runningOnSecurePage = protocol === "https:";
 
   if (!configuredUrl) {
-    return runningLocally ? [LOCAL_BACKEND_URL] : [];
+    return runningLocally ? LOOPBACK_BACKEND_URLS : [];
   }
 
   if (!runningLocally && isLoopbackUrl(configuredUrl)) {
@@ -79,11 +86,24 @@ const getBackendCandidates = () => {
     return [];
   }
 
-  if (configuredUrl === LOCAL_BACKEND_URL || !runningLocally) {
+  if (!runningLocally) {
     return [configuredUrl];
   }
 
-  return [configuredUrl, LOCAL_BACKEND_URL];
+  let candidates = addUniqueUrl([], configuredUrl);
+
+  if (isLoopbackUrl(configuredUrl)) {
+    for (const localUrl of LOOPBACK_BACKEND_URLS) {
+      candidates = addUniqueUrl(candidates, localUrl);
+    }
+    return candidates;
+  }
+
+  for (const localUrl of LOOPBACK_BACKEND_URLS) {
+    candidates = addUniqueUrl(candidates, localUrl);
+  }
+
+  return candidates;
 };
 
 const getBackendConfigError = () => {

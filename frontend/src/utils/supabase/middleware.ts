@@ -36,14 +36,26 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect routes: redirect unauthenticated users to /login
-  // Exclude public routes from protection
-  const publicRoutes = ['/login', '/register', '/forgot-password', '/auth'];
-  const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname.startsWith(route));
+  const pathname = request.nextUrl.pathname;
+  const authRoutes = ["/login", "/register", "/forgot-password"];
+  const publicRoutes = ["/", "/auth"];
+  const protectedPaths = ["/chat", "/cases", "/activity", "/profile", "/settings"];
 
-  if (!user && !isPublicRoute && request.nextUrl.pathname !== '/') {
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+  const isProtectedPath = protectedPaths.some((route) => pathname.startsWith(route));
+
+  if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    url.pathname = "/chat";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  if (!user && isProtectedPath && !isPublicRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
   }
 

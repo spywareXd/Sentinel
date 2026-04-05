@@ -6,6 +6,7 @@ import ChatFeed from "@/components/chat/ChatFeed";
 import Composer from "@/components/chat/Composer";
 import PunishmentPopout from "@/components/chat/PunishmentPopout";
 import RightRail from "@/components/layout/RightRail";
+import SecurityHandshakeLoader from "@/components/layout/SecurityHandshakeLoader";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import {
@@ -87,6 +88,7 @@ function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -208,50 +210,54 @@ function ChatPageContent() {
 
   useEffect(() => {
     const getUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
-      if (error || !user) {
-        router.push("/login");
-        return;
-      }
+        if (error || !user) {
+          router.push("/login");
+          return;
+        }
 
-      setUserId(user.id);
+        setUserId(user.id);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username, wallet_address")
-        .eq("id", user.id)
-        .single();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username, wallet_address")
+          .eq("id", user.id)
+          .single();
 
-      if (profile) {
-        setUsername(profile.username || user.email || "You");
-        setWalletAddress(profile.wallet_address || "");
-      }
+        if (profile) {
+          setUsername(profile.username || user.email || "You");
+          setWalletAddress(profile.wallet_address || "");
+        }
 
-      const punishment = await fetchActivePunishment(user.id, profile?.wallet_address);
-      setActivePunishment(punishment);
+        const punishment = await fetchActivePunishment(user.id, profile?.wallet_address);
+        setActivePunishment(punishment);
 
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, username")
-        .order("username", { ascending: true });
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, username")
+          .order("username", { ascending: true });
 
-      if (profiles) {
-        setParticipants(
-          profiles.map((profileItem: { id: string; username: string | null }) => {
-            const displayName = profileItem.username || "Unknown";
+        if (profiles) {
+          setParticipants(
+            profiles.map((profileItem: { id: string; username: string | null }) => {
+              const displayName = profileItem.username || "Unknown";
 
-            return {
-              name: displayName,
-              initials: displayName.slice(0, 1).toUpperCase(),
-              role: profileItem.id === user.id ? "Online" : "Participant",
-              status: profileItem.id === user.id ? "online" : "offline",
-            };
-          }),
-        );
+              return {
+                name: displayName,
+                initials: displayName.slice(0, 1).toUpperCase(),
+                role: profileItem.id === user.id ? "Online" : "Participant",
+                status: profileItem.id === user.id ? "online" : "offline",
+              };
+            }),
+          );
+        }
+      } finally {
+        setIsBootstrapping(false);
       }
     };
 
@@ -503,6 +509,10 @@ function ChatPageContent() {
       setMessages((prev) => prev.filter((message) => message.id !== messageId));
     }
   };
+
+  if (isBootstrapping) {
+    return <SecurityHandshakeLoader />;
+  }
 
   return (
     <div

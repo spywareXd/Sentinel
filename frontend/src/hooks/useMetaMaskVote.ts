@@ -41,6 +41,7 @@ const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "";
 const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111 in hex
 const LOCAL_BACKEND_URL = "http://localhost:8000";
+const LOOPBACK_BACKEND_URLS = [LOCAL_BACKEND_URL, "http://127.0.0.1:8000"];
 
 export type VoteOption = "punish" | "dismiss";
 
@@ -82,6 +83,12 @@ const normalizeUrl = (value?: string | null) => {
   return trimmed ? trimmed : null;
 };
 
+const addUniqueUrl = (urls: string[], value?: string | null) => {
+  const normalized = normalizeUrl(value);
+  if (!normalized || urls.includes(normalized)) return urls;
+  return [...urls, normalized];
+};
+
 const isLoopbackUrl = (value?: string | null) => {
   if (!value) return false;
 
@@ -120,7 +127,7 @@ const getBackendCandidates = () => {
   const runningOnSecurePage = protocol === "https:";
 
   if (!configuredUrl) {
-    return runningLocally ? [LOCAL_BACKEND_URL] : [];
+    return runningLocally ? LOOPBACK_BACKEND_URLS : [];
   }
 
   if (!runningLocally && isLoopbackUrl(configuredUrl)) {
@@ -131,11 +138,24 @@ const getBackendCandidates = () => {
     return [];
   }
 
-  if (configuredUrl === LOCAL_BACKEND_URL || !runningLocally) {
+  if (!runningLocally) {
     return [configuredUrl];
   }
 
-  return [configuredUrl, LOCAL_BACKEND_URL];
+  let candidates = addUniqueUrl([], configuredUrl);
+
+  if (isLoopbackUrl(configuredUrl)) {
+    for (const localUrl of LOOPBACK_BACKEND_URLS) {
+      candidates = addUniqueUrl(candidates, localUrl);
+    }
+    return candidates;
+  }
+
+  for (const localUrl of LOOPBACK_BACKEND_URLS) {
+    candidates = addUniqueUrl(candidates, localUrl);
+  }
+
+  return candidates;
 };
 
 const getBackendConfigError = () => {
