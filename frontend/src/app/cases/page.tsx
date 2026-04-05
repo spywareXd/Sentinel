@@ -702,8 +702,11 @@ export default function CasesPage() {
                 <CaseDetailPanel
                   caseItem={selectedCase}
                   moderatorAddress={moderatorWallet}
-                  onVoteSuccess={(decision) => {
+                  onVoteResolved={(decision) => {
                     resolveCase(selectedCase.id, decision);
+                    setRefreshKey((currentKey) => currentKey + 1);
+                  }}
+                  onVoteRecorded={() => {
                     setRefreshKey((currentKey) => currentKey + 1);
                   }}
                   onVoteRecordedOnChain={(decision) => {

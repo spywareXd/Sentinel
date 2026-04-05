@@ -12,7 +12,8 @@ type CaseActionsProps = {
   blockchainCaseId: number | null;
   supabaseCaseId: string;
   moderatorAddress: string;
-  onVoteSuccess: (decision: "Punished" | "Dismissed") => void;
+  onVoteResolved: (decision: "Punished" | "Dismissed") => void;
+  onVoteRecorded: () => void;
   onVoteRecordedOnChain: (decision: "Punished" | "Dismissed") => void;
 };
 
@@ -23,12 +24,13 @@ export default function CaseActions({
   blockchainCaseId,
   supabaseCaseId,
   moderatorAddress,
-  onVoteSuccess,
+  onVoteResolved,
+  onVoteRecorded,
   onVoteRecordedOnChain,
 }: CaseActionsProps) {
   const [pendingVote, setPendingVote] = useState<VoteOption | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { status, txHash, error, castVote, reset } = useMetaMaskVote();
+  const { status, txHash, error, syncResult, castVote, reset } = useMetaMaskVote();
 
   const handleVote = async (vote: VoteOption) => {
     // 1. Guard against parallel calls
@@ -64,9 +66,12 @@ export default function CaseActions({
   };
 
   const handleModalClose = () => {
-    // On success, notify parent so UI updates without re-fetch
-    if (status === "success" && pendingVote) {
-      onVoteSuccess(pendingVote === "punish" ? "Punished" : "Dismissed");
+    if (status === "success") {
+      if (syncResult?.caseResolved && syncResult.finalDecision) {
+        onVoteResolved(syncResult.finalDecision);
+      } else {
+        onVoteRecorded();
+      }
     }
     if (status === "recorded_on_chain" && pendingVote) {
       onVoteRecordedOnChain(

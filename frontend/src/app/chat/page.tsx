@@ -12,6 +12,7 @@ import {
   getExpiredActivePunishmentIds,
   getPunishmentExpiry,
   isActivePunishment,
+  splitPunishmentReason,
 } from "@/utils/punishment";
 import { roomDetails } from "@/mockdata/room";
 import type { UserPunishment } from "@/types/database/userPunishment";
@@ -115,8 +116,8 @@ function ChatPageContent() {
     activePunishment !== null &&
     acknowledgedPunishmentId !== activePunishment.id;
   const timeoutReason =
-    hasActivePunishment && activePunishment?.reason?.trim()
-      ? activePunishment.reason.trim()
+    hasActivePunishment && activePunishment
+      ? splitPunishmentReason(activePunishment.reason).display
       : "No reason was provided.";
   const punishmentStatusLabel =
     hasActivePunishment && activePunishment

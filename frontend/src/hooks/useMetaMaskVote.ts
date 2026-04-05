@@ -55,10 +55,16 @@ export type VoteStatus =
   | "success"
   | "error";
 
+export type VoteSyncResult = {
+  caseResolved: boolean;
+  finalDecision: "Punished" | "Dismissed" | null;
+};
+
 export type UseMetaMaskVoteReturn = {
   status: VoteStatus;
   txHash: string | null;
   error: string | null;
+  syncResult: VoteSyncResult | null;
   castVote: (
     blockchainCaseId: number,
     supabaseCaseId: string,
@@ -208,7 +214,21 @@ const syncVoteToBackend = async (payload: {
       });
 
       if (syncResp.ok) {
-        return;
+        const data = (await syncResp.json().catch(() => null)) as
+          | { case_resolved?: boolean; decision?: string | null }
+          | null;
+
+        const finalDecision =
+          data?.decision === "punish"
+            ? "Punished"
+            : data?.decision === "dismiss"
+              ? "Dismissed"
+              : null;
+
+        return {
+          caseResolved: Boolean(data?.case_resolved),
+          finalDecision,
+        } satisfies VoteSyncResult;
       }
 
       lastFailure = await getSyncFailureDetail(syncResp, baseUrl);
@@ -302,11 +322,13 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
   const [status, setStatus] = useState<VoteStatus>("idle");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<VoteSyncResult | null>(null);
 
   const reset = () => {
     setStatus("idle");
     setTxHash(null);
     setError(null);
+    setSyncResult(null);
   };
 
   const castVote = async (
@@ -330,6 +352,7 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
 
     setError(null);
     setTxHash(null);
+    setSyncResult(null);
 
     // --- 1. Check MetaMask availability ---
     if (typeof window === "undefined" || !window.ethereum) {
@@ -406,12 +429,13 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
       // --- 6. Sync result to backend ---
       setStatus("syncing");
       try {
-        await syncVoteToBackend({
+        const backendSyncResult = await syncVoteToBackend({
           case_id: supabaseCaseId,
           moderator_address: signerAddress,
           vote: voteCode,
           tx_hash: tx.hash,
         });
+        setSyncResult(backendSyncResult);
       } catch (syncErr: unknown) {
         const syncErrorMessage =
           syncErr instanceof Error ? syncErr.message : String(syncErr);
@@ -465,7 +489,7 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
     }
   };
 
-  return { status, txHash, error, castVote, reset };
+  return { status, txHash, error, syncResult, castVote, reset };
 }
 
 // Augment window for TypeScript

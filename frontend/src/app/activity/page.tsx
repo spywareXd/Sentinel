@@ -11,6 +11,7 @@ import {
   getExpiredActivePunishmentIds,
   getPunishmentExpiry,
   isActivePunishment,
+  splitPunishmentReason,
 } from "@/utils/punishment";
 import type { ActivityRecord } from "@/types/activity";
 import type { UserPunishment } from "@/types/database/userPunishment";
@@ -111,7 +112,7 @@ const mapActivityRecord = (punishment: UserPunishment): ActivityRecord => {
     issuedAt: formatTimestamp(punishment.issued_at),
     expiresAt: formatTimestamp(getPunishmentExpiry(punishment)?.toISOString()),
     durationLabel: formatDuration(punishment),
-    reason: punishment.reason?.trim() || "No reason was attached to this punishment.",
+    reason: splitPunishmentReason(punishment.reason).display,
     caseReference: punishment.case_id ? `Case ${punishment.case_id}` : "No linked case",
     issuerLabel: punishment.issued_by ? `Issuer ${punishment.issued_by.slice(0, 8)}` : "Automated moderation",
     walletAddress: punishment.wallet_address || "No wallet recorded",

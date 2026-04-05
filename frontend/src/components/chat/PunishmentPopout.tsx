@@ -1,7 +1,7 @@
 "use client";
 
 import { ShieldAlert } from "lucide-react";
-import { getPunishmentExpiry } from "@/utils/punishment";
+import { getPunishmentExpiry, splitPunishmentReason } from "@/utils/punishment";
 import type { UserPunishment } from "@/types/database/userPunishment";
 
 type PunishmentPopoutProps = {
@@ -29,6 +29,8 @@ export default function PunishmentPopout({
   punishment,
   onAcknowledge,
 }: PunishmentPopoutProps) {
+  const reasonDisplay = splitPunishmentReason(punishment.reason).display;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,6,12,0.72)] px-6"
@@ -57,7 +59,7 @@ export default function PunishmentPopout({
             Reason
           </p>
           <p className="mt-2 text-sm leading-7 text-[var(--on-surface)]">
-            {punishment.reason?.trim() || "No reason was provided for this punishment."}
+            {reasonDisplay}
           </p>
         </div>
 
