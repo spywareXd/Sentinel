@@ -7,28 +7,39 @@ import type { CaseDecision } from "@/types/mockdata/cases";
 
 type CaseActionsProps = {
   isResolved: boolean;
+  needsVote: boolean;
   decision: CaseDecision;
   blockchainCaseId: number | null;
   supabaseCaseId: string;
   moderatorAddress: string;
-  onVoteSuccess: (decision: "Punished" | "Dismissed") => void;
+  onVoteResolved: (decision: "Punished" | "Dismissed") => void;
+  onVoteRecorded: () => void;
+  onVoteRecordedOnChain: (decision: "Punished" | "Dismissed") => void;
 };
 
 export default function CaseActions({
   isResolved,
+  needsVote,
   decision,
   blockchainCaseId,
   supabaseCaseId,
   moderatorAddress,
-  onVoteSuccess,
+  onVoteResolved,
+  onVoteRecorded,
+  onVoteRecordedOnChain,
 }: CaseActionsProps) {
   const [pendingVote, setPendingVote] = useState<VoteOption | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { status, txHash, error, castVote, reset } = useMetaMaskVote();
+  const { status, txHash, error, syncResult, castVote, reset } = useMetaMaskVote();
 
   const handleVote = async (vote: VoteOption) => {
     // 1. Guard against parallel calls
-    if (status !== "idle" && status !== "success" && status !== "error") {
+    if (
+      status !== "idle" &&
+      status !== "success" &&
+      status !== "recorded_on_chain" &&
+      status !== "error"
+    ) {
       return;
     }
 
@@ -55,9 +66,17 @@ export default function CaseActions({
   };
 
   const handleModalClose = () => {
-    // On success, notify parent so UI updates without re-fetch
-    if (status === "success" && pendingVote) {
-      onVoteSuccess(pendingVote === "punish" ? "Punished" : "Dismissed");
+    if (status === "success") {
+      if (syncResult?.caseResolved && syncResult.finalDecision) {
+        onVoteResolved(syncResult.finalDecision);
+      } else {
+        onVoteRecorded();
+      }
+    }
+    if (status === "recorded_on_chain" && pendingVote) {
+      onVoteRecordedOnChain(
+        pendingVote === "punish" ? "Punished" : "Dismissed"
+      );
     }
     setIsModalOpen(false);
     setPendingVote(null);
@@ -74,8 +93,23 @@ export default function CaseActions({
     );
   }
 
+  if (!needsVote) {
+    return (
+      <div className="border-t border-[color:color-mix(in_srgb,var(--outline-variant)_20%,transparent)] pt-4">
+        <div className="rounded-xl bg-[var(--surface-container-highest)] px-4 py-3 text-center text-sm font-semibold text-[var(--on-surface)]">
+          Your vote is already recorded on-chain. This case has been moved to history
+          while Sentinel catches up.
+        </div>
+      </div>
+    );
+  }
+
   const noChain = blockchainCaseId === null;
-  const isVoting = status !== "idle" && status !== "success" && status !== "error";
+  const isVoting =
+    status !== "idle" &&
+    status !== "success" &&
+    status !== "recorded_on_chain" &&
+    status !== "error";
 
   return (
     <>

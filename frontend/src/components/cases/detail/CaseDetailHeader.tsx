@@ -6,6 +6,8 @@ const statusTone = {
     "bg-[color:color-mix(in_srgb,var(--secondary)_18%,transparent)] text-[var(--secondary)]",
   Resolved:
     "bg-[color:color-mix(in_srgb,var(--tertiary)_18%,transparent)] text-[var(--tertiary)]",
+  "Backend Error":
+    "bg-[color:color-mix(in_srgb,var(--error)_14%,transparent)] text-[var(--error)]",
 } as const;
 
 type CaseDetailHeaderProps = {

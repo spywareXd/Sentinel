@@ -1,12 +1,14 @@
-export type CaseSeverity = "High" | "Medium" | "Low";
+export type CaseSeverity = "Extreme" | "High" | "Medium" | "Low";
 
-export type CaseStatus = "Assigned" | "Voting" | "Resolved";
+export type CaseStatus = "Assigned" | "Voting" | "Resolved" | "Backend Error";
 
 export type CaseDecision = "Punished" | "Dismissed" | null;
 
 export type CaseRecord = {
   id: string;
+  messageId: string | null;
   number: string;
+  createdAtTimestamp: number;
   title: string;
   category: string;
   severity: CaseSeverity;

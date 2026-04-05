@@ -9,15 +9,22 @@ type ChatFeedProps = {
   messages: Message[];
   onDelete: (messageId: string) => void;
   searchQuery: string;
+  focusMessageId?: string | null;
 };
 
 export default function ChatFeed({
   messages,
   onDelete,
   searchQuery,
+  focusMessageId,
 }: ChatFeedProps) {
   const feedRef = useRef<HTMLElement | null>(null);
+  const focusResetTimeoutRef = useRef<number | null>(null);
+  const focusActivateFrameRef = useRef<number | null>(null);
+  const lastHandledFocusRef = useRef<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const effectiveHighlightedMessageId = focusMessageId ? highlightedMessageId : null;
 
   // Syncing state during render is the recommended pattern to avoid cascading useEffect renders
   const [prevMessages, setPrevMessages] = useState(messages);
@@ -63,6 +70,63 @@ export default function ChatFeed({
     };
   }, [openMenuId]); // Added openMenuId as dependency to use latest value safely
 
+  useEffect(() => {
+    if (!focusMessageId) {
+      lastHandledFocusRef.current = null;
+      if (focusResetTimeoutRef.current !== null) {
+        window.clearTimeout(focusResetTimeoutRef.current);
+        focusResetTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    if (lastHandledFocusRef.current === focusMessageId) {
+      return;
+    }
+
+    const feed = feedRef.current;
+    const target = feed?.querySelector<HTMLElement>(`[data-message-id="${focusMessageId}"]`);
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    if (focusActivateFrameRef.current !== null) {
+      window.cancelAnimationFrame(focusActivateFrameRef.current);
+    }
+
+    focusActivateFrameRef.current = window.requestAnimationFrame(() => {
+      setHighlightedMessageId(focusMessageId);
+      focusActivateFrameRef.current = null;
+    });
+    lastHandledFocusRef.current = focusMessageId;
+
+    if (focusResetTimeoutRef.current !== null) {
+      window.clearTimeout(focusResetTimeoutRef.current);
+    }
+
+    focusResetTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedMessageId((current) =>
+        current === focusMessageId ? null : current,
+      );
+    }, 3000);
+
+    return () => {
+      if (focusActivateFrameRef.current !== null) {
+        window.cancelAnimationFrame(focusActivateFrameRef.current);
+        focusActivateFrameRef.current = null;
+      }
+      if (focusResetTimeoutRef.current !== null) {
+        window.clearTimeout(focusResetTimeoutRef.current);
+        focusResetTimeoutRef.current = null;
+      }
+    };
+  }, [focusMessageId, messages]);
+
   const handleCopy = async (text: string) => {
     await navigator.clipboard.writeText(text);
     setOpenMenuId(null);
@@ -95,22 +159,27 @@ export default function ChatFeed({
               
               return (
                 <div key={message.id} className={index === 0 ? "" : (isGrouped ? "mt-1" : "mt-4")}>
-                  <MessageRow
-                    message={msgWithGrouped}
-                    shouldOpenUp={index >= messages.length - 3}
-                    isMenuOpen={openMenuId === message.id}
-                    onToggleMenu={() =>
-                      setOpenMenuId((currentId) =>
-                        currentId === message.id ? null : message.id,
-                      )
-                    }
-                    onCopy={(text) => void handleCopy(text)}
-                    onDelete={(messageId) => {
-                      onDelete(messageId);
-                      setOpenMenuId(null);
-                    }}
-                    onCloseMenu={() => setOpenMenuId(null)}
-                  />
+                  <div data-message-id={message.id} className="scroll-mt-24">
+                    <MessageRow
+                      message={{
+                        ...msgWithGrouped,
+                        isFocused: effectiveHighlightedMessageId === message.id,
+                      }}
+                      shouldOpenUp={index >= messages.length - 3}
+                      isMenuOpen={openMenuId === message.id}
+                      onToggleMenu={() =>
+                        setOpenMenuId((currentId) =>
+                          currentId === message.id ? null : message.id,
+                        )
+                      }
+                      onCopy={(text) => void handleCopy(text)}
+                      onDelete={(messageId) => {
+                        onDelete(messageId);
+                        setOpenMenuId(null);
+                      }}
+                      onCloseMenu={() => setOpenMenuId(null)}
+                    />
+                  </div>
                 </div>
               );
             })}

@@ -3,7 +3,9 @@ import type { CaseRecord } from "@/types/mockdata/cases";
 export const caseRecords: CaseRecord[] = [
   {
     id: "case-9284",
+    messageId: null,
     number: "#9284",
+    createdAtTimestamp: 1726060200,
     title: "Harassment Report",
     category: "Direct Threat",
     severity: "High",
@@ -32,7 +34,9 @@ export const caseRecords: CaseRecord[] = [
   },
   {
     id: "case-9281",
+    messageId: null,
     number: "#9281",
+    createdAtTimestamp: 1726058220,
     title: "Trash-talk Dispute",
     category: "Escalated Banter",
     severity: "Low",
@@ -61,7 +65,9 @@ export const caseRecords: CaseRecord[] = [
   },
   {
     id: "case-9270",
+    messageId: null,
     number: "#9270",
+    createdAtTimestamp: 1726051800,
     title: "Hate-speech Review",
     category: "Protected Group Abuse",
     severity: "High",
@@ -91,7 +97,9 @@ export const caseRecords: CaseRecord[] = [
   },
   {
     id: "case-9264",
+    messageId: null,
     number: "#9264",
+    createdAtTimestamp: 1726060680,
     title: "Self-harm Encouragement",
     category: "Critical Harm",
     severity: "High",
@@ -120,7 +128,9 @@ export const caseRecords: CaseRecord[] = [
   },
   {
     id: "case-9258",
+    messageId: null,
     number: "#9258",
+    createdAtTimestamp: 1726037400,
     title: "Spam Flag Review",
     category: "Repeated Posting",
     severity: "Medium",

@@ -4,6 +4,17 @@ type CaseInsightSectionProps = {
   caseItem: CaseRecord;
 };
 
+const formatPunishmentType = (value: string | null) => {
+  if (!value?.trim()) return "Unavailable";
+
+  return value
+    .replace(/[_-]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
 /**
  * Formats punishment duration in minutes into a human-readable string.
  */
@@ -37,7 +48,11 @@ const getPunishmentColor = (type: string | null) => {
 };
 
 export default function CaseInsightSection({ caseItem }: CaseInsightSectionProps) {
-  const hasPunishment = caseItem.punishmentType && caseItem.punishmentType !== "none";
+  const normalizedPunishmentType = caseItem.punishmentType?.trim().toLowerCase() ?? "";
+  const recommendationLabel =
+    normalizedPunishmentType === "none"
+      ? "None"
+      : formatPunishmentType(caseItem.punishmentType);
 
   return (
     <div className="space-y-6">
@@ -52,25 +67,23 @@ export default function CaseInsightSection({ caseItem }: CaseInsightSectionProps
         </div>
       </div>
 
-      {hasPunishment && (
-        <div className="space-y-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--on-surface-variant)]">
-            AI Recommendation
-          </p>
-          <div className="flex items-center gap-3 rounded-2xl bg-[color:color-mix(in_srgb,var(--surface-container-high)_55%,transparent)] p-4">
-            <div 
-              className="flex items-center justify-center rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white"
-              style={{ background: getPunishmentColor(caseItem.punishmentType) }}
-            >
-              {caseItem.punishmentType}
-            </div>
-            <div className="h-4 w-px bg-[var(--outline-variant)] opacity-30" />
-            <p className="text-sm font-bold text-[var(--on-surface)]">
-              {formatDuration(caseItem.punishmentDuration)}
-            </p>
+      <div className="space-y-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--on-surface-variant)]">
+          AI Recommendation
+        </p>
+        <div className="flex items-center gap-3 rounded-2xl bg-[color:color-mix(in_srgb,var(--surface-container-high)_55%,transparent)] p-4">
+          <div 
+            className="flex items-center justify-center rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white"
+            style={{ background: getPunishmentColor(caseItem.punishmentType) }}
+          >
+            {recommendationLabel}
           </div>
+          <div className="h-4 w-px bg-[var(--outline-variant)] opacity-30" />
+          <p className="text-sm font-bold text-[var(--on-surface)]">
+            {formatDuration(caseItem.punishmentDuration)}
+          </p>
         </div>
-      )}
+      </div>
     </div>
   );
 }

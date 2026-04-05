@@ -7,8 +7,10 @@ export type Message = {
   authorLogoUrl?: string | null;
   time: string;
   text: string;
+  flagged?: boolean;
   tone: MessageTone;
   grouped?: boolean;
+  isFocused?: boolean;
 };
 
 export type FeedMeta = {

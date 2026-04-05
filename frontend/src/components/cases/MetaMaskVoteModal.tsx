@@ -54,6 +54,13 @@ const statusConfig: Record<
     icon: "🔄",
     color: "var(--primary)",
   },
+  recorded_on_chain: {
+    label: "Vote Recorded On-Chain",
+    subtext:
+      "Your wallet vote is confirmed. Sentinel could not finish backend sync, so this case will move to history locally.",
+    icon: "⛓️",
+    color: "var(--tertiary)",
+  },
   success: {
     label: "Vote Cast!",
     subtext: "Your vote has been recorded on the blockchain and synced.",
@@ -81,7 +88,11 @@ export default function MetaMaskVoteModal({
   // Close on overlay click
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current) {
-      if (status === "success" || status === "error") {
+      if (
+        status === "success" ||
+        status === "recorded_on_chain" ||
+        status === "error"
+      ) {
         onClose();
       }
     }
@@ -91,7 +102,12 @@ export default function MetaMaskVoteModal({
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && (status === "success" || status === "error")) {
+      if (
+        e.key === "Escape" &&
+        (status === "success" ||
+          status === "recorded_on_chain" ||
+          status === "error")
+      ) {
         onClose();
       }
     };
@@ -102,7 +118,7 @@ export default function MetaMaskVoteModal({
   if (!isOpen) return null;
 
   const cfg = statusConfig[status];
-  const isActive = !["success", "error"].includes(status);
+  const isActive = !["success", "recorded_on_chain", "error"].includes(status);
   const isPunish = vote === "punish";
 
   return (
@@ -144,7 +160,9 @@ export default function MetaMaskVoteModal({
               {isPunish ? "Approve" : "Dismiss"}
             </span>
           </div>
-          {(status === "success" || status === "error") && (
+          {(status === "success" ||
+            status === "recorded_on_chain" ||
+            status === "error") && (
             <button
               onClick={onClose}
               className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-highest)] hover:text-[var(--on-surface)]"
@@ -188,6 +206,11 @@ export default function MetaMaskVoteModal({
             <p className="mt-1 text-sm text-[var(--on-surface-variant)]">
               {status === "error" && error ? error : cfg.subtext}
             </p>
+            {status === "recorded_on_chain" && error && (
+              <p className="mt-2 text-xs text-[var(--on-surface-variant)]">
+                Detail: {error}
+              </p>
+            )}
           </div>
         </div>
 
@@ -222,6 +245,16 @@ export default function MetaMaskVoteModal({
             style={{ background: "var(--primary)" }}
           >
             Done
+          </button>
+        )}
+
+        {status === "recorded_on_chain" && (
+          <button
+            onClick={onClose}
+            className="w-full rounded-xl py-3 text-sm font-bold text-white transition-opacity hover:opacity-90"
+            style={{ background: "var(--tertiary)" }}
+          >
+            Move To History
           </button>
         )}
 

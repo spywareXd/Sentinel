@@ -8,27 +8,59 @@ type CaseListProps = {
 };
 
 const severityTone = {
-  High: "bg-[color:color-mix(in_srgb,var(--error)_20%,transparent)] text-[var(--error)]",
-  Medium:
-    "bg-[color:color-mix(in_srgb,var(--tertiary)_18%,transparent)] text-[var(--tertiary)]",
-  Low: "bg-[var(--surface-container-highest)] text-[var(--on-surface-variant)]",
+  Extreme: "text-[color:color-mix(in_srgb,var(--error)_96%,white_4%)]",
+  High: "text-[var(--error)]",
+  Medium: "text-[var(--tertiary)]",
+  Low: "text-[var(--on-surface-variant)]",
 } as const;
 
 const iconTone = {
+  Extreme: {
+    Icon: ShieldAlert,
+    iconColor: "text-[color:color-mix(in_srgb,var(--error)_96%,white_4%)]",
+  },
   High: {
     Icon: ShieldAlert,
     iconColor: "text-[var(--error)]",
-    railColor: "border-[var(--error)]",
   },
   Medium: {
     Icon: MessageSquareWarning,
     iconColor: "text-[var(--secondary)]",
-    railColor: "border-[var(--secondary)]",
   },
   Low: {
     Icon: ShieldCheck,
     iconColor: "text-[var(--on-surface-variant)]",
-    railColor: "border-[var(--surface-container-highest)]",
+  },
+} as const;
+
+const severityStyles = {
+  Extreme: {
+    railColor: "color-mix(in srgb, var(--error) 96%, white 4%)",
+    railGlow: "color-mix(in srgb, var(--error) 38%, transparent)",
+    pillBackground: "color-mix(in srgb, var(--error) 20%, transparent)",
+    pillBorder: "color-mix(in srgb, var(--error) 42%, transparent)",
+    scoreFill: "color-mix(in srgb, var(--error) 94%, black 6%)",
+  },
+  High: {
+    railColor: "color-mix(in srgb, var(--error) 92%, white 8%)",
+    railGlow: "color-mix(in srgb, var(--error) 32%, transparent)",
+    pillBackground: "color-mix(in srgb, var(--error) 16%, transparent)",
+    pillBorder: "color-mix(in srgb, var(--error) 34%, transparent)",
+    scoreFill: "color-mix(in srgb, var(--error) 86%, white 14%)",
+  },
+  Medium: {
+    railColor: "color-mix(in srgb, var(--tertiary) 76%, white 24%)",
+    railGlow: "color-mix(in srgb, var(--tertiary) 24%, transparent)",
+    pillBackground: "color-mix(in srgb, var(--tertiary) 14%, transparent)",
+    pillBorder: "color-mix(in srgb, var(--tertiary) 28%, transparent)",
+    scoreFill: "color-mix(in srgb, var(--tertiary) 78%, white 22%)",
+  },
+  Low: {
+    railColor: "color-mix(in srgb, var(--primary) 34%, var(--surface-container-highest) 66%)",
+    railGlow: "color-mix(in srgb, var(--primary) 16%, transparent)",
+    pillBackground: "color-mix(in srgb, var(--primary) 12%, transparent)",
+    pillBorder: "color-mix(in srgb, var(--primary) 22%, transparent)",
+    scoreFill: "color-mix(in srgb, var(--primary) 54%, white 46%)",
   },
 } as const;
 
@@ -42,6 +74,7 @@ export default function CaseList({
       <div className="flex flex-col gap-3">
         {cases.map((caseItem) => {
           const style = iconTone[caseItem.severity];
+          const severityStyle = severityStyles[caseItem.severity];
           const Icon = style.Icon;
           const isSelected = selectedCaseId === caseItem.id;
 
@@ -50,14 +83,17 @@ export default function CaseList({
               key={caseItem.id}
               onClick={() => onSelectCase(caseItem.id)}
               className={[
-                "group flex cursor-pointer gap-6 rounded-3xl border-l-4 p-5 text-left transition-all",
-                style.railColor,
+                "group flex cursor-pointer gap-6 rounded-3xl border-l-[5px] p-5 text-left transition-all",
                 isSelected
                   ? "bg-[var(--surface-container-high)]"
-                  : caseItem.status === "Resolved"
+                  : !caseItem.assignedToMe
                     ? "bg-[var(--surface-container-lowest)] opacity-70 hover:opacity-100"
                     : "bg-[var(--surface-container-low)] hover:bg-[var(--surface-bright)]",
               ].join(" ")}
+              style={{
+                borderLeftColor: severityStyle.railColor,
+                boxShadow: `-1px 0 0 0 ${severityStyle.railGlow}`,
+              }}
             >
               <div className="flex shrink-0 flex-col items-center gap-2">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-container-lowest)]">
@@ -78,6 +114,9 @@ export default function CaseList({
                       "rounded px-2 py-0.5 text-[10px] font-black uppercase",
                       severityTone[caseItem.severity],
                     ].join(" ")}
+                    style={{
+                      background: severityStyle.pillBackground,
+                    }}
                   >
                     {caseItem.severity} Severity
                   </span>
@@ -85,7 +124,9 @@ export default function CaseList({
                     {caseItem.resolvedAt ?? caseItem.openedAt}
                   </span>
                   {caseItem.assignedToMe && (
-                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--primary)_18%,transparent)] px-2 py-0.5 text-[10px] font-black uppercase text-[var(--primary)]">
+                    <span
+                      className="rounded-full bg-[var(--surface-container-highest)] px-2 py-0.5 text-[10px] font-black uppercase text-[var(--on-surface-variant)]"
+                    >
                       Assigned to you
                     </span>
                   )}
@@ -113,14 +154,19 @@ export default function CaseList({
                   </div>
                   <div className="h-1.5 max-w-[180px] flex-1 overflow-hidden rounded-full bg-[var(--surface-container-lowest)]">
                     <div
-                      className="h-full bg-[var(--secondary)]"
-                      style={{ width: `${Math.round(caseItem.harmfulScore * 100)}%` }}
+                      className="h-full"
+                      style={{
+                        width: `${Math.round(caseItem.harmfulScore * 100)}%`,
+                        background: severityStyle.scoreFill,
+                      }}
                     />
                   </div>
                   <span className="text-[10px] font-black text-[var(--on-surface-variant)]">
                     {caseItem.status === "Resolved"
                       ? caseItem.decision
-                      : `${Math.round(caseItem.harmfulScore * 100)}%`}
+                      : caseItem.status === "Backend Error"
+                        ? "Backend Error"
+                        : `${Math.round(caseItem.harmfulScore * 100)}%`}
                   </span>
                 </div>
               </div>

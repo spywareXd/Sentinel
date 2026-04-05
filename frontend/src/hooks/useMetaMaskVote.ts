@@ -25,12 +25,23 @@ const SENTINEL_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "uint256", name: "caseId", type: "uint256" },
+      { indexed: true, internalType: "address", name: "moderator", type: "address" },
+      { indexed: false, internalType: "uint8", name: "decision", type: "uint8" },
+    ],
+    name: "VoteCast",
+    type: "event",
+  },
 ] as const;
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "";
 const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111 in hex
 const LOCAL_BACKEND_URL = "http://localhost:8000";
+const LOOPBACK_BACKEND_URLS = [LOCAL_BACKEND_URL, "http://127.0.0.1:8000"];
 
 export type VoteOption = "punish" | "dismiss";
 
@@ -41,13 +52,20 @@ export type VoteStatus =
   | "awaiting_approval"
   | "pending"
   | "syncing"
+  | "recorded_on_chain"
   | "success"
   | "error";
+
+export type VoteSyncResult = {
+  caseResolved: boolean;
+  finalDecision: "Punished" | "Dismissed" | null;
+};
 
 export type UseMetaMaskVoteReturn = {
   status: VoteStatus;
   txHash: string | null;
   error: string | null;
+  syncResult: VoteSyncResult | null;
   castVote: (
     blockchainCaseId: number,
     supabaseCaseId: string,
@@ -65,26 +83,95 @@ const normalizeUrl = (value?: string | null) => {
   return trimmed ? trimmed : null;
 };
 
+const addUniqueUrl = (urls: string[], value?: string | null) => {
+  const normalized = normalizeUrl(value);
+  if (!normalized || urls.includes(normalized)) return urls;
+  return [...urls, normalized];
+};
+
+const isLoopbackUrl = (value?: string | null) => {
+  if (!value) return false;
+
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+};
+
+const isInsecureHttpUrl = (value?: string | null) => {
+  if (!value) return false;
+
+  try {
+    return new URL(value).protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+const needsTunnelBypassHeader = (value: string) => {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "loca.lt" || hostname.endsWith(".loca.lt");
+  } catch {
+    return false;
+  }
+};
+
 const getBackendCandidates = () => {
   const configuredUrl = normalizeUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "";
   const runningLocally = isLocalHostname(hostname);
+  const runningOnSecurePage = protocol === "https:";
 
   if (!configuredUrl) {
-    return runningLocally ? [LOCAL_BACKEND_URL] : [];
+    return runningLocally ? LOOPBACK_BACKEND_URLS : [];
   }
 
-  if (configuredUrl === LOCAL_BACKEND_URL || !runningLocally) {
+  if (!runningLocally && isLoopbackUrl(configuredUrl)) {
+    return [];
+  }
+
+  if (!runningLocally && runningOnSecurePage && isInsecureHttpUrl(configuredUrl)) {
+    return [];
+  }
+
+  if (!runningLocally) {
     return [configuredUrl];
   }
 
-  return [configuredUrl, LOCAL_BACKEND_URL];
+  let candidates = addUniqueUrl([], configuredUrl);
+
+  if (isLoopbackUrl(configuredUrl)) {
+    for (const localUrl of LOOPBACK_BACKEND_URLS) {
+      candidates = addUniqueUrl(candidates, localUrl);
+    }
+    return candidates;
+  }
+
+  for (const localUrl of LOOPBACK_BACKEND_URLS) {
+    candidates = addUniqueUrl(candidates, localUrl);
+  }
+
+  return candidates;
 };
 
 const getBackendConfigError = () => {
   const configuredUrl = normalizeUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "";
   const runningLocally = isLocalHostname(hostname);
+  const runningOnSecurePage = protocol === "https:";
+
+  if (!runningLocally && isLoopbackUrl(configuredUrl)) {
+    return "The deployed frontend bundle is pointing at localhost for the backend. Set NEXT_PUBLIC_BACKEND_URL to a public HTTPS backend URL in Vercel and redeploy.";
+  }
+
+  if (!runningLocally && runningOnSecurePage && isInsecureHttpUrl(configuredUrl)) {
+    return "The deployed frontend bundle is pointing at an insecure HTTP backend URL. Set NEXT_PUBLIC_BACKEND_URL to a public HTTPS backend URL in Vercel and redeploy.";
+  }
 
   if (configuredUrl || runningLocally) {
     return null;
@@ -139,13 +226,29 @@ const syncVoteToBackend = async (payload: {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "bypass-tunnel-reminder": "true",
+          ...(needsTunnelBypassHeader(baseUrl)
+            ? { "bypass-tunnel-reminder": "true" }
+            : {}),
         },
         body: JSON.stringify(payload),
       });
 
       if (syncResp.ok) {
-        return;
+        const data = (await syncResp.json().catch(() => null)) as
+          | { case_resolved?: boolean; decision?: string | null }
+          | null;
+
+        const finalDecision =
+          data?.decision === "punish"
+            ? "Punished"
+            : data?.decision === "dismiss"
+              ? "Dismissed"
+              : null;
+
+        return {
+          caseResolved: Boolean(data?.case_resolved),
+          finalDecision,
+        } satisfies VoteSyncResult;
       }
 
       lastFailure = await getSyncFailureDetail(syncResp, baseUrl);
@@ -160,6 +263,73 @@ const syncVoteToBackend = async (payload: {
   throw new Error(lastFailure);
 };
 
+const hasVoteCastEventInReceipt = (
+  contract: Contract,
+  receipt: {
+    logs?: Array<{ topics: readonly string[]; data: string }>;
+  } | null,
+  blockchainCaseId: number,
+  moderatorAddress: string,
+  voteCode: number
+) => {
+  if (!receipt?.logs?.length) {
+    return false;
+  }
+
+  const expectedModeratorAddress = moderatorAddress.toLowerCase();
+
+  for (const log of receipt.logs) {
+    try {
+      const parsedLog = contract.interface.parseLog({
+        topics: [...log.topics],
+        data: log.data,
+      });
+
+      if (!parsedLog || parsedLog.name !== "VoteCast") {
+        continue;
+      }
+
+      const parsedCaseId = Number(parsedLog.args.caseId ?? parsedLog.args[0]);
+      const parsedModerator = String(
+        parsedLog.args.moderator ?? parsedLog.args[1]
+      ).toLowerCase();
+      const parsedDecision = Number(
+        parsedLog.args.decision ?? parsedLog.args[2]
+      );
+
+      if (
+        parsedCaseId === blockchainCaseId &&
+        parsedModerator === expectedModeratorAddress &&
+        parsedDecision === voteCode
+      ) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return false;
+};
+
+const hasRecordedVoteForModerator = async (
+  contract: Contract,
+  blockchainCaseId: number,
+  moderatorAddress: string,
+) => {
+  try {
+    const recordedVote = await contract.getVote(
+      BigInt(blockchainCaseId),
+      moderatorAddress,
+    );
+
+    return Number(recordedVote) > 0;
+  } catch (err) {
+    console.error("Could not verify already-recorded vote:", err);
+    return false;
+  }
+};
+
 /**
  * Hook that drives the full MetaMask vote flow:
  * 1. Connects MetaMask
@@ -172,11 +342,13 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
   const [status, setStatus] = useState<VoteStatus>("idle");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<VoteSyncResult | null>(null);
 
   const reset = () => {
     setStatus("idle");
     setTxHash(null);
     setError(null);
+    setSyncResult(null);
   };
 
   const castVote = async (
@@ -185,13 +357,22 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
     vote: VoteOption,
     moderatorAddress: string
   ) => {
+    let contract: Contract | null = null;
+    let signerAddress = "";
+
     // --- 0. Prevent parallel calls ---
-    if (status !== "idle" && status !== "success" && status !== "error") {
+    if (
+      status !== "idle" &&
+      status !== "success" &&
+      status !== "recorded_on_chain" &&
+      status !== "error"
+    ) {
       return;
     }
 
     setError(null);
     setTxHash(null);
+    setSyncResult(null);
 
     // --- 1. Check MetaMask availability ---
     if (typeof window === "undefined" || !window.ethereum) {
@@ -242,9 +423,9 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
 
       // Re-get provider after potential network switch
       const signer = await new BrowserProvider(window.ethereum).getSigner();
-      const signerAddress = (await signer.getAddress()).toLowerCase();
+      signerAddress = (await signer.getAddress()).toLowerCase();
       const expectedModeratorAddress = moderatorAddress.toLowerCase();
-      const contract = new Contract(CONTRACT_ADDRESS, SENTINEL_ABI, signer);
+      contract = new Contract(CONTRACT_ADDRESS, SENTINEL_ABI, signer);
 
       if (expectedModeratorAddress && signerAddress !== expectedModeratorAddress) {
         console.warn(
@@ -263,16 +444,37 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
       setStatus("pending");
 
       // --- 5. Wait for confirmation ---
-      await tx.wait(1);
+      const receipt = await tx.wait(1);
 
       // --- 6. Sync result to backend ---
       setStatus("syncing");
-      await syncVoteToBackend({
-        case_id: supabaseCaseId,
-        moderator_address: signerAddress,
-        vote: voteCode,
-        tx_hash: tx.hash,
-      });
+      try {
+        const backendSyncResult = await syncVoteToBackend({
+          case_id: supabaseCaseId,
+          moderator_address: signerAddress,
+          vote: voteCode,
+          tx_hash: tx.hash,
+        });
+        setSyncResult(backendSyncResult);
+      } catch (syncErr: unknown) {
+        const syncErrorMessage =
+          syncErr instanceof Error ? syncErr.message : String(syncErr);
+        const voteRecordedOnChain = hasVoteCastEventInReceipt(
+          contract,
+          receipt,
+          blockchainCaseId,
+          signerAddress,
+          voteCode
+        );
+
+        if (voteRecordedOnChain) {
+          setError(syncErrorMessage);
+          setStatus("recorded_on_chain");
+          return;
+        }
+
+        throw syncErr;
+      }
 
       setStatus("success");
     } catch (err: unknown) {
@@ -281,6 +483,20 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
       const errorMessage = err instanceof Error ? err.message : String(err);
       const errorCode = (err as { code?: number | string })?.code;
       const shortMessage = (err as { shortMessage?: string })?.shortMessage;
+      const combinedMessage = `${shortMessage ?? ""} ${errorMessage ?? ""}`.toLowerCase();
+
+      if (
+        contract &&
+        signerAddress &&
+        /already voted/.test(combinedMessage) &&
+        (await hasRecordedVoteForModerator(contract, blockchainCaseId, signerAddress))
+      ) {
+        setError(
+          "This wallet already has a recorded on-chain vote for this case. Moving it to history locally while Sentinel catches up.",
+        );
+        setStatus("recorded_on_chain");
+        return;
+      }
 
       if (errorCode === 4001 || errorCode === "ACTION_REJECTED") {
         setError("You rejected the transaction in MetaMask.");
@@ -293,7 +509,7 @@ export function useMetaMaskVote(): UseMetaMaskVoteReturn {
     }
   };
 
-  return { status, txHash, error, castVote, reset };
+  return { status, txHash, error, syncResult, castVote, reset };
 }
 
 // Augment window for TypeScript

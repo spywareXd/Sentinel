@@ -3,42 +3,121 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Shield, Wallet, Fingerprint, HelpCircle, Landmark, CheckCircle2 } from 'lucide-react';
 import { signup } from '@/app/actions/auth';
 
 export default function Register() {
   const [walletAddress, setWalletAddress] = useState<string>('');
+  const [hasLinkedWallet, setHasLinkedWallet] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const hasLinkedWalletRef = useRef(false);
+
+  const updateLinkedWallet = (nextWalletAddress: string) => {
+    const normalizedWalletAddress = nextWalletAddress.trim();
+    const isLinked = normalizedWalletAddress.length > 0;
+
+    hasLinkedWalletRef.current = isLinked;
+    setHasLinkedWallet(isLinked);
+    setWalletAddress(normalizedWalletAddress);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    updateLinkedWallet('');
+    setError(null);
+
+    const ethereum = window.ethereum;
+    if (!ethereum) {
+      return;
+    }
+
+    const handleAccountsChanged = (accountsParam: unknown) => {
+      const accounts = Array.isArray(accountsParam)
+        ? accountsParam.filter((account): account is string => typeof account === 'string')
+        : [];
+
+      if (!hasLinkedWalletRef.current) {
+        return;
+      }
+
+      updateLinkedWallet(accounts[0] ?? '');
+      setError(null);
+    };
+
+    ethereum.on?.('accountsChanged', handleAccountsChanged);
+
+    return () => {
+      ethereum.removeListener?.('accountsChanged', handleAccountsChanged);
+    };
+  }, []);
 
   const connectMetaMask = async () => {
-    if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
-      try {
-        setIsConnecting(true);
-        setError(null);
-        const accounts = (await window.ethereum.request({
-          method: "eth_requestAccounts",
-        })) as string[];
-        if (accounts && accounts.length > 0) {
-          setWalletAddress(accounts[0]);
-        }
-      } catch (err: unknown) {
-        if (err && typeof err === 'object' && 'code' in err && err.code === 4001) {
-          setError('Connection request was rejected.');
-        } else {
-          setError('Failed to connect to MetaMask.');
-        }
-        console.error(err);
-      } finally {
-        setIsConnecting(false);
-      }
-    } else {
+    if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') {
       setError('MetaMask is not installed. Please install it to continue.');
+      return;
+    }
+
+    const ethereum = window.ethereum;
+
+    try {
+      setIsConnecting(true);
+      setError(null);
+
+      try {
+        await ethereum.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }],
+        });
+      } catch (permissionErr: unknown) {
+        const permissionCode =
+          permissionErr && typeof permissionErr === 'object' && 'code' in permissionErr
+            ? permissionErr.code
+            : undefined;
+
+        if (permissionCode === 4001) {
+          throw permissionErr;
+        }
+      }
+
+      const accountsResponse = await ethereum.request({
+        method: 'eth_requestAccounts',
+      });
+
+      const accounts = Array.isArray(accountsResponse)
+        ? accountsResponse.filter((account): account is string => typeof account === 'string')
+        : [];
+
+      if (accounts.length > 0) {
+        updateLinkedWallet(accounts[0]);
+      } else {
+        updateLinkedWallet('');
+        setError('No MetaMask account was selected.');
+      }
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 4001) {
+        setError('Connection request was rejected.');
+      } else {
+        setError('Failed to connect to MetaMask.');
+      }
+      console.error(err);
+    } finally {
+      setIsConnecting(false);
     }
   };
+
+  const clearWalletSelection = () => {
+    updateLinkedWallet('');
+    setError(null);
+  };
+
+  const isWalletLinked = hasLinkedWallet && walletAddress.length > 0;
 
   const handleSubmit = async (formData: FormData) => {
     setLoading(true);
@@ -82,13 +161,13 @@ export default function Register() {
 
           <form className="space-y-6" action={handleSubmit}>
             {/* Hidden inputted wallet state for form submission */}
-            <input type="hidden" name="walletAddress" value={walletAddress} />
+            <input type="hidden" name="walletAddress" value={isWalletLinked ? walletAddress : ''} />
             
             {/* MetaMask Connection Box */}
             <div className="border border-outline-variant/30 rounded-2xl p-5 bg-surface-container-lowest/30">
               <div className="flex gap-4 mb-5">
                 <div className="p-2 rounded-lg bg-surface-container h-fit">
-                  {walletAddress ? (
+                  {isWalletLinked ? (
                     <CheckCircle2 className="w-5 h-5 text-green-400" />
                   ) : (
                     <Wallet className="w-5 h-5 text-on-surface" />
@@ -96,17 +175,25 @@ export default function Register() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-on-surface tracking-wide uppercase mb-1">
-                    {walletAddress ? 'Wallet Connected' : 'Wallet Connection Required'}
+                    {isWalletLinked ? 'Wallet Connected' : 'Wallet Connection Required'}
                   </h3>
                   <p className="text-xs text-on-surface-variant/70 leading-relaxed break-all">
-                    {walletAddress 
+                    {isWalletLinked
                       ? `Linked: ${walletAddress}`
                       : 'Your wallet address serves as your unique community identity and enables your voting power in Nexus governance.'}
                   </p>
+                  <p className="mt-2 text-[11px] text-on-surface-variant/60">
+                    This page starts with a fresh wallet selection for signup only. It does not disconnect your normal in-app wallet session.
+                  </p>
+                  {isWalletLinked && (
+                    <p className="mt-2 text-[11px] text-on-surface-variant/60">
+                      To use another wallet, switch the active MetaMask account in MetaMask and click refresh.
+                    </p>
+                  )}
                 </div>
               </div>
               
-              {!walletAddress && (
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button 
                   type="button" 
                   onClick={connectMetaMask}
@@ -114,12 +201,25 @@ export default function Register() {
                   className="w-full flex items-center justify-center gap-2 bg-[#a3a5fa] hover:bg-[#b5b7fa] text-[#0a0c14] font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(163,165,250,0.15)] hover:shadow-[0_0_25px_rgba(163,165,250,0.3)] transition-all font-headline text-[15px] disabled:opacity-70"
                 >
                   <Wallet className="w-5 h-5" />
-                  {isConnecting ? 'Connecting...' : 'Connect MetaMask'}
+                  {isConnecting
+                    ? 'Connecting...'
+                    : isWalletLinked
+                      ? 'Switch / Refresh Wallet'
+                      : 'Connect MetaMask'}
                 </button>
-              )}
+                {isWalletLinked && (
+                  <button
+                    type="button"
+                    onClick={clearWalletSelection}
+                    className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-4 py-3.5 text-[15px] font-semibold text-on-surface transition-colors hover:bg-surface-bright/50 sm:w-auto"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className={`transition-opacity duration-300 ${walletAddress ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+            <div className={`transition-opacity duration-300 ${isWalletLinked ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
               <div className="flex items-center justify-center gap-4 relative mb-6">
                 <div className="h-[1px] bg-outline-variant/30 flex-1"></div>
                 <span className="text-[10px] font-bold tracking-widest text-on-surface-variant/60 uppercase px-1">Step 2: Profile Details</span>
@@ -165,9 +265,9 @@ export default function Register() {
               {/* Submit Button */}
               <button 
                 type="submit"
-                disabled={!walletAddress || loading} 
+                disabled={!isWalletLinked || loading} 
                 className={`w-full font-bold py-3.5 rounded-xl transition-all font-headline text-[15px] ${
-                  walletAddress 
+                  isWalletLinked
                     ? 'bg-[#a3a5fa] text-[#0a0c14] hover:bg-[#b5b7fa] hover:shadow-[0_0_20px_rgba(163,165,250,0.2)]' 
                     : 'bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant/50 cursor-not-allowed'
                 } disabled:opacity-70`}

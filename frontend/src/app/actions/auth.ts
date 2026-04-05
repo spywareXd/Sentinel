@@ -1,4 +1,4 @@
-'use server'
+﻿'use server'
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -12,11 +12,9 @@ export async function login(formData: FormData) {
   const identifier = formData.get('identifier') as string
   const password = formData.get('password') as string
 
-  // Determine if the identifier is an email or a username
   let email = identifier
 
   if (!identifier.includes('@')) {
-    // It's a username — look up the associated email from profiles
     const { data: profile, error: lookupError } = await supabase
       .from('profiles')
       .select('email')
@@ -37,7 +35,14 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/chat')
+  return { success: true }
+}
+
+export async function logout() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  revalidatePath('/', 'layout')
+  redirect('/login')
 }
 
 export async function signup(formData: FormData) {
@@ -50,7 +55,6 @@ export async function signup(formData: FormData) {
     walletAddress: formData.get('walletAddress') as string,
   }
 
-  // Passing user_metadata is essential so a Supabase trigger can insert them to public.profiles
   const { error } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
