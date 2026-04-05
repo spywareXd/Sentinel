@@ -89,10 +89,13 @@ export default function MessageRow({
 
           <div
             className={[
-              "max-w-2xl rounded-xl p-4 text-sm leading-7 shadow-sm",
+              "max-w-2xl rounded-xl p-4 text-sm leading-7 shadow-sm transition-all duration-300",
               isSelf
                 ? "rounded-tr-sm bg-[var(--surface-container-high)] text-[var(--on-surface)]"
                 : "rounded-tl-sm bg-[var(--surface-container-high)] text-[var(--on-surface)]",
+              message.isFocused
+                ? "ring-1 ring-[color:color-mix(in_srgb,var(--error)_72%,white_28%)] shadow-[0_0_0_1px_color-mix(in_srgb,var(--error)_16%,transparent),0_10px_24px_rgba(127,29,29,0.12)]"
+                : "",
             ].join(" ")}
           >
             {message.text}

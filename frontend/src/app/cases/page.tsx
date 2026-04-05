@@ -13,6 +13,7 @@ import { createClient } from "@/utils/supabase/client";
 type TopTab = "Assigned" | "History";
 const LOCAL_BACKEND_URL = "http://localhost:8000";
 const LOCAL_RECORDED_VOTES_KEY = "sentinel:recorded-on-chain-votes";
+const REASON_SEPARATOR = "|||";
 
 type LocalRecordedVote = {
   decision: "Punished" | "Dismissed";
@@ -29,13 +30,53 @@ const normalizeUrl = (value?: string | null) => {
   return trimmed ? trimmed : null;
 };
 
+const isLoopbackUrl = (value?: string | null) => {
+  if (!value) return false;
+
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+};
+
+const isInsecureHttpUrl = (value?: string | null) => {
+  if (!value) return false;
+
+  try {
+    return new URL(value).protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+const needsTunnelBypassHeader = (value: string) => {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "loca.lt" || hostname.endsWith(".loca.lt");
+  } catch {
+    return false;
+  }
+};
+
 const getBackendCandidates = () => {
   const configuredUrl = normalizeUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "";
   const runningLocally = isLocalHostname(hostname);
+  const runningOnSecurePage = protocol === "https:";
 
   if (!configuredUrl) {
     return runningLocally ? [LOCAL_BACKEND_URL] : [];
+  }
+
+  if (!runningLocally && isLoopbackUrl(configuredUrl)) {
+    return [];
+  }
+
+  if (!runningLocally && runningOnSecurePage && isInsecureHttpUrl(configuredUrl)) {
+    return [];
   }
 
   if (configuredUrl === LOCAL_BACKEND_URL || !runningLocally) {
@@ -48,7 +89,17 @@ const getBackendCandidates = () => {
 const getBackendConfigError = () => {
   const configuredUrl = normalizeUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "";
   const runningLocally = isLocalHostname(hostname);
+  const runningOnSecurePage = protocol === "https:";
+
+  if (!runningLocally && isLoopbackUrl(configuredUrl)) {
+    return "The deployed frontend bundle is pointing at localhost for the backend. Set NEXT_PUBLIC_BACKEND_URL to a public HTTPS backend URL in Vercel and redeploy.";
+  }
+
+  if (!runningLocally && runningOnSecurePage && isInsecureHttpUrl(configuredUrl)) {
+    return "The deployed frontend bundle is pointing at an insecure HTTP backend URL. Set NEXT_PUBLIC_BACKEND_URL to a public HTTPS backend URL in Vercel and redeploy.";
+  }
 
   if (configuredUrl || runningLocally) {
     return null;
@@ -119,9 +170,52 @@ const toTitleCase = (value: string) =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 
+const summarizeReasonHeadline = (value?: string | null) => {
+  const normalized = value?.trim();
+  if (!normalized) return "Flagged Content";
+
+  const words = normalized
+    .replace(/[_-]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3);
+
+  return words.length ? toTitleCase(words.join(" ")) : "Flagged Content";
+};
+
+const splitAiReason = (value?: string | null) => {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return {
+      summary: "Flagged Content",
+      detail: "No reason provided",
+    };
+  }
+
+  if (normalized.includes(REASON_SEPARATOR)) {
+    const [summaryPart, detailPart] = normalized.split(REASON_SEPARATOR, 2);
+    const summary = summaryPart?.trim() || summarizeReasonHeadline(detailPart);
+    const detail = detailPart?.trim() || normalized;
+    return {
+      summary,
+      detail,
+    };
+  }
+
+  return {
+    summary: summarizeReasonHeadline(normalized),
+    detail: normalized,
+  };
+};
+
 const getSeverity = (harmfulScore: number, severeScore: number) => {
-  if (severeScore >= 0.75 || harmfulScore >= 0.75) return "High";
-  if (severeScore >= 0.4 || harmfulScore >= 0.4) return "Medium";
+  const severityPercent = Math.round(
+    Math.max(harmfulScore, severeScore) * 100,
+  );
+
+  if (severityPercent >= 100) return "Extreme";
+  if (severityPercent >= 80) return "High";
+  if (severityPercent >= 50) return "Medium";
   return "Low";
 };
 
@@ -157,6 +251,7 @@ const mapStatus = (status?: string | null) =>
 
 interface DbCase {
   id: string | number;
+  message_id?: string | null;
   blockchain_case_id?: number | null;
   decision?: string | null;
   status?: string | null;
@@ -185,7 +280,7 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
   const status = mapStatus(dbCase.status);
   const openedAt = formatTimestamp(dbCase.created_at) ?? "Recently opened";
   const resolvedAt = status === "Resolved" ? "Resolved" : undefined;
-  const reason = dbCase.ai_reason || "flagged content";
+  const parsedReason = splitAiReason(dbCase.ai_reason);
   const offenderName =
     dbCase.offender?.username ||
     dbCase.offender?.wallet_address?.slice(0, 10) ||
@@ -193,13 +288,14 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
 
   return {
     id: String(dbCase.id),
+    messageId: dbCase.message_id ? String(dbCase.message_id) : null,
     number:
       dbCase.blockchain_case_id !== null && dbCase.blockchain_case_id !== undefined
         ? `#${dbCase.blockchain_case_id}`
         : `#${String(dbCase.id).slice(0, 6).toUpperCase()}`,
     createdAtTimestamp: getTimestamp(dbCase.created_at),
-    title: toTitleCase(reason),
-    category: toTitleCase(reason),
+    title: toTitleCase(parsedReason.summary),
+    category: toTitleCase(parsedReason.summary),
     severity: getSeverity(harmfulScore, severeScore),
     status,
     decision,
@@ -209,7 +305,7 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
     wasAssignedToMe: true,
     needsVote: status !== "Resolved",
     harmfulScore,
-    aiReason: dbCase.ai_reason ?? "No reason provided",
+    aiReason: parsedReason.detail,
     offender: offenderName,
     reporter: "Scanner",
     flaggedMessage: dbCase.messages?.content ?? "Original message unavailable.",
@@ -324,6 +420,7 @@ export default function CasesPage() {
   const [searchQuery] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [moderatorWallet, setModeratorWallet] = useState("");
   const detailPanelRef = useRef<HTMLDivElement | null>(null);
@@ -366,6 +463,7 @@ export default function CasesPage() {
   useEffect(() => {
     const loadCases = async () => {
       setIsLoading(true);
+      setLoadError(null);
       try {
         const {
           data: { user },
@@ -404,6 +502,7 @@ export default function CasesPage() {
         if (backendCandidates.length === 0) {
           lastFailure = backendConfigError ?? "No backend candidates available.";
           console.error("Network error loading cases:", lastFailure);
+          setLoadError(String(lastFailure));
           setCases([]);
           setSelectedCaseId(null);
           return;
@@ -415,9 +514,13 @@ export default function CasesPage() {
               `${baseUrl}/moderation/my-cases?wallet_address=${encodeURIComponent(walletAddress)}`,
               {
                 cache: "no-store",
-                headers: {
-                  "bypass-tunnel-reminder": "true",
-                },
+                ...(needsTunnelBypassHeader(baseUrl)
+                  ? {
+                      headers: {
+                        "bypass-tunnel-reminder": "true",
+                      },
+                    }
+                  : {}),
               },
             );
 
@@ -435,6 +538,12 @@ export default function CasesPage() {
 
         if (!payload) {
           console.error("Network error loading cases:", lastFailure);
+          setLoadError(
+            backendConfigError ??
+              (lastFailure instanceof Error
+                ? lastFailure.message
+                : String(lastFailure ?? "Could not load moderation cases.")),
+          );
           setCases([]);
           setSelectedCaseId(null);
           return;
@@ -447,6 +556,7 @@ export default function CasesPage() {
         setCases(mappedCases);
       } catch (err) {
         console.error("Network error loading cases:", err);
+        setLoadError(err instanceof Error ? err.message : String(err));
         setCases([]);
         setSelectedCaseId(null);
       } finally {
@@ -567,6 +677,13 @@ export default function CasesPage() {
             {isLoading ? (
               <div className="rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
                 Loading your assigned cases...
+              </div>
+            ) : loadError ? (
+              <div className="rounded-3xl border border-[var(--outline-variant)] bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
+                <p className="font-semibold text-[var(--on-surface)]">
+                  Cases could not be loaded.
+                </p>
+                <p className="mt-2">{loadError}</p>
               </div>
             ) : (
               <CaseList

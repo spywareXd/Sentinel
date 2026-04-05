@@ -41,7 +41,7 @@ export default function ActivityDetailPanel({ record }: ActivityDetailPanelProps
   const Icon = meta.Icon;
 
   return (
-    <aside className="flex h-full max-h-[calc(100vh-8rem)] min-h-0 flex-col gap-6 rounded-[1.75rem] border border-[color:color-mix(in_srgb,var(--outline-variant)_25%,transparent)] bg-[color:color-mix(in_srgb,var(--surface-container-highest)_45%,transparent)] p-6 backdrop-blur-xl">
+    <aside className="flex h-full min-h-0 flex-col gap-6 rounded-[1.75rem] border border-[color:color-mix(in_srgb,var(--outline-variant)_25%,transparent)] bg-[color:color-mix(in_srgb,var(--surface-container-highest)_45%,transparent)] p-6 backdrop-blur-xl">
       <div className="flex items-start justify-between gap-4">
         <div>
           <span

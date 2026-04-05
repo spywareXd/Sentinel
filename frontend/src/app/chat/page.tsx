@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ChatFeed from "@/components/chat/ChatFeed";
 import Composer from "@/components/chat/Composer";
 import PunishmentPopout from "@/components/chat/PunishmentPopout";
@@ -84,6 +84,7 @@ const formatPunishmentLabel = (punishmentType?: string | null) => {
 export default function Home() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,6 +96,8 @@ export default function Home() {
   const [activePunishment, setActivePunishment] = useState<UserPunishment | null>(null);
   const [acknowledgedPunishmentId, setAcknowledgedPunishmentId] = useState<string | null>(null);
   const [countdownNowMs, setCountdownNowMs] = useState<number>(() => Date.now());
+  const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
+  const focusMessageId = searchParams.get("focus");
 
   const hasActivePunishment =
     activePunishment !== null && isActivePunishment(activePunishment);
@@ -139,6 +142,10 @@ export default function Home() {
 
     return hours > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
   }, [activePunishment, countdownNowMs, hasActivePunishment]);
+  const isFocusedMessageMissing =
+    Boolean(focusMessageId) &&
+    hasLoadedMessages &&
+    !messages.some((message) => message.id === focusMessageId);
 
   const fetchActivePunishment = async (
     currentUserId: string,
@@ -335,6 +342,7 @@ export default function Home() {
 
       if (messagesError) {
         console.error("Error fetching messages:", messagesError);
+        setHasLoadedMessages(true);
         return;
       }
 
@@ -369,6 +377,8 @@ export default function Home() {
         });
         setMessages(formatted);
       }
+
+      setHasLoadedMessages(true);
     };
 
     void fetchMessages();
@@ -534,10 +544,16 @@ export default function Home() {
                 )}
               </div>
             )}
+            {isFocusedMessageMissing && (
+              <div className="mx-6 mt-4 rounded-2xl border border-[color:color-mix(in_srgb,var(--tertiary)_24%,transparent)] bg-[color:color-mix(in_srgb,var(--tertiary)_10%,transparent)] px-5 py-3 text-sm text-[var(--on-surface)]">
+                The flagged message is no longer available in the current feed.
+              </div>
+            )}
             <ChatFeed
               messages={filteredMessages}
               onDelete={handleDelete}
               searchQuery={searchQuery}
+              focusMessageId={focusMessageId}
             />
             <Composer
               onSend={handleSend}

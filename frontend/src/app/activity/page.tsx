@@ -331,15 +331,15 @@ export default function ActivityPage() {
   );
 
   return (
-    <main className="flex min-h-screen bg-[var(--background)] text-[var(--on-surface)]">
+    <main className="flex h-screen overflow-hidden bg-[var(--background)] text-[var(--on-surface)]">
       <Sidebar />
 
-      <section className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ActivityHeader />
 
-        <div className="flex-1 overflow-hidden px-8 py-8">
-          <div className="grid h-full min-h-0 gap-6 xl:grid-cols-[minmax(0,1.2fr)_420px]">
-            <section className="premium-scrollbar flex min-h-0 flex-col gap-6 overflow-y-auto pr-2">
+        <div className="flex min-h-0 flex-1 overflow-hidden px-8 py-8">
+          <div className="grid min-h-0 flex-1 gap-6 overflow-hidden xl:grid-cols-[minmax(0,1.2fr)_420px]">
+            <section className="flex min-h-0 flex-col gap-6">
               <ActivitySummaryStrip
                 total={summary.total}
                 active={summary.active}
@@ -347,21 +347,23 @@ export default function ActivityPage() {
                 timeouts={summary.timeouts}
               />
 
-              {isLoading ? (
-                <div className="rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
-                  Loading activity...
-                </div>
-              ) : records.length ? (
-                <ActivityList
-                  records={records}
-                  selectedActivityId={selectedRecord?.id ?? ""}
-                  onSelectActivity={setSelectedActivityId}
-                />
-              ) : (
-                <div className="rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
-                  No punishment history yet.
-                </div>
-              )}
+              <div className="premium-scrollbar min-h-0 flex-1 overflow-y-auto pr-2">
+                {isLoading ? (
+                  <div className="rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
+                    Loading activity...
+                  </div>
+                ) : records.length ? (
+                  <ActivityList
+                    records={records}
+                    selectedActivityId={selectedRecord?.id ?? ""}
+                    onSelectActivity={setSelectedActivityId}
+                  />
+                ) : (
+                  <div className="rounded-3xl bg-[var(--surface-container-low)] p-6 text-sm text-[var(--on-surface-variant)]">
+                    No punishment history yet.
+                  </div>
+                )}
+              </div>
             </section>
 
             <div className="min-h-0">

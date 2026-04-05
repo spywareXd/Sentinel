@@ -10,6 +10,7 @@ export type Message = {
   flagged?: boolean;
   tone: MessageTone;
   grouped?: boolean;
+  isFocused?: boolean;
 };
 
 export type FeedMeta = {

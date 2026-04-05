@@ -76,13 +76,53 @@ const normalizeUrl = (value?: string | null) => {
   return trimmed ? trimmed : null;
 };
 
+const isLoopbackUrl = (value?: string | null) => {
+  if (!value) return false;
+
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+};
+
+const isInsecureHttpUrl = (value?: string | null) => {
+  if (!value) return false;
+
+  try {
+    return new URL(value).protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+const needsTunnelBypassHeader = (value: string) => {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "loca.lt" || hostname.endsWith(".loca.lt");
+  } catch {
+    return false;
+  }
+};
+
 const getBackendCandidates = () => {
   const configuredUrl = normalizeUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "";
   const runningLocally = isLocalHostname(hostname);
+  const runningOnSecurePage = protocol === "https:";
 
   if (!configuredUrl) {
     return runningLocally ? [LOCAL_BACKEND_URL] : [];
+  }
+
+  if (!runningLocally && isLoopbackUrl(configuredUrl)) {
+    return [];
+  }
+
+  if (!runningLocally && runningOnSecurePage && isInsecureHttpUrl(configuredUrl)) {
+    return [];
   }
 
   if (configuredUrl === LOCAL_BACKEND_URL || !runningLocally) {
@@ -95,7 +135,17 @@ const getBackendCandidates = () => {
 const getBackendConfigError = () => {
   const configuredUrl = normalizeUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "";
   const runningLocally = isLocalHostname(hostname);
+  const runningOnSecurePage = protocol === "https:";
+
+  if (!runningLocally && isLoopbackUrl(configuredUrl)) {
+    return "The deployed frontend bundle is pointing at localhost for the backend. Set NEXT_PUBLIC_BACKEND_URL to a public HTTPS backend URL in Vercel and redeploy.";
+  }
+
+  if (!runningLocally && runningOnSecurePage && isInsecureHttpUrl(configuredUrl)) {
+    return "The deployed frontend bundle is pointing at an insecure HTTP backend URL. Set NEXT_PUBLIC_BACKEND_URL to a public HTTPS backend URL in Vercel and redeploy.";
+  }
 
   if (configuredUrl || runningLocally) {
     return null;
@@ -150,7 +200,9 @@ const syncVoteToBackend = async (payload: {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "bypass-tunnel-reminder": "true",
+          ...(needsTunnelBypassHeader(baseUrl)
+            ? { "bypass-tunnel-reminder": "true" }
+            : {}),
         },
         body: JSON.stringify(payload),
       });

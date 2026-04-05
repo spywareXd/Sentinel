@@ -13,6 +13,13 @@ SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
 
 # Blockchain Config
 RPC_URL = os.getenv("RPC_URL")
+RPC_FALLBACK_URLS = [
+    url.strip()
+    for url in (os.getenv("RPC_FALLBACK_URLS") or "").split(",")
+    if url.strip()
+]
+RPC_URLS = [url for url in [RPC_URL, *RPC_FALLBACK_URLS] if url]
+RPC_TRUST_ENV = os.getenv("RPC_TRUST_ENV", "true").strip().lower() not in {"0", "false", "no", "off"}
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 OWNER_PRIVATE_KEY = os.getenv("OWNER_PRIVATE_KEY")
 

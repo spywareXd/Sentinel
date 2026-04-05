@@ -8,12 +8,17 @@ type CaseListProps = {
 };
 
 const severityTone = {
+  Extreme: "text-[color:color-mix(in_srgb,var(--error)_96%,white_4%)]",
   High: "text-[var(--error)]",
   Medium: "text-[var(--tertiary)]",
   Low: "text-[var(--on-surface-variant)]",
 } as const;
 
 const iconTone = {
+  Extreme: {
+    Icon: ShieldAlert,
+    iconColor: "text-[color:color-mix(in_srgb,var(--error)_96%,white_4%)]",
+  },
   High: {
     Icon: ShieldAlert,
     iconColor: "text-[var(--error)]",
@@ -29,23 +34,33 @@ const iconTone = {
 } as const;
 
 const severityStyles = {
+  Extreme: {
+    railColor: "color-mix(in srgb, var(--error) 96%, white 4%)",
+    railGlow: "color-mix(in srgb, var(--error) 38%, transparent)",
+    pillBackground: "color-mix(in srgb, var(--error) 20%, transparent)",
+    pillBorder: "color-mix(in srgb, var(--error) 42%, transparent)",
+    scoreFill: "color-mix(in srgb, var(--error) 94%, black 6%)",
+  },
   High: {
-    railColor: "color-mix(in srgb, var(--error) 88%, white 12%)",
-    railGlow: "color-mix(in srgb, var(--error) 28%, transparent)",
-    pillBackground: "color-mix(in srgb, var(--error) 14%, transparent)",
-    pillBorder: "color-mix(in srgb, var(--error) 30%, transparent)",
+    railColor: "color-mix(in srgb, var(--error) 92%, white 8%)",
+    railGlow: "color-mix(in srgb, var(--error) 32%, transparent)",
+    pillBackground: "color-mix(in srgb, var(--error) 16%, transparent)",
+    pillBorder: "color-mix(in srgb, var(--error) 34%, transparent)",
+    scoreFill: "color-mix(in srgb, var(--error) 86%, white 14%)",
   },
   Medium: {
     railColor: "color-mix(in srgb, var(--tertiary) 76%, white 24%)",
     railGlow: "color-mix(in srgb, var(--tertiary) 24%, transparent)",
     pillBackground: "color-mix(in srgb, var(--tertiary) 14%, transparent)",
     pillBorder: "color-mix(in srgb, var(--tertiary) 28%, transparent)",
+    scoreFill: "color-mix(in srgb, var(--tertiary) 78%, white 22%)",
   },
   Low: {
     railColor: "color-mix(in srgb, var(--primary) 34%, var(--surface-container-highest) 66%)",
     railGlow: "color-mix(in srgb, var(--primary) 16%, transparent)",
     pillBackground: "color-mix(in srgb, var(--primary) 12%, transparent)",
     pillBorder: "color-mix(in srgb, var(--primary) 22%, transparent)",
+    scoreFill: "color-mix(in srgb, var(--primary) 54%, white 46%)",
   },
 } as const;
 
@@ -139,8 +154,11 @@ export default function CaseList({
                   </div>
                   <div className="h-1.5 max-w-[180px] flex-1 overflow-hidden rounded-full bg-[var(--surface-container-lowest)]">
                     <div
-                      className="h-full bg-[var(--secondary)]"
-                      style={{ width: `${Math.round(caseItem.harmfulScore * 100)}%` }}
+                      className="h-full"
+                      style={{
+                        width: `${Math.round(caseItem.harmfulScore * 100)}%`,
+                        background: severityStyle.scoreFill,
+                      }}
                     />
                   </div>
                   <span className="text-[10px] font-black text-[var(--on-surface-variant)]">
