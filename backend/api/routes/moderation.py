@@ -4,8 +4,15 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from core.database import supabase
 from services.blockchain import get_case_from_chain, get_case_count, verify_vote_on_chain
+from services.moderation import create_moderation_case, finalize_case_resolution
 
 router = APIRouter(prefix="/moderation", tags=["Moderation"])
+
+CASE_BASE_SELECT = (
+    "id, message_id, offender_id, moderator_1, moderator_2, moderator_3, "
+    "status, decision, created_at, toxicity_score, ai_reason, "
+    "punishment_type, punishment_duration, blockchain_case_id, tx_hash"
+)
 
 
 class VoteSyncRequest(BaseModel):
@@ -62,10 +69,56 @@ def _log_vote_event(case: dict, chain_case: dict | None, source: str, moderator_
         print(f"   breakdown: {', '.join(breakdown)}")
 
 
+def _hydrate_cases(cases: list[dict]) -> list[dict]:
+    """
+    Enrich cases without relying on old FK-based nested selects.
+    """
+    if not cases:
+        return []
+
+    message_ids = sorted({case["message_id"] for case in cases if case.get("message_id")})
+    offender_ids = sorted({case["offender_id"] for case in cases if case.get("offender_id")})
+
+    messages_by_id: dict[str, dict] = {}
+    offenders_by_id: dict[str, dict] = {}
+
+    if message_ids:
+        message_resp = supabase.table("messages") \
+            .select("id, content") \
+            .in_("id", message_ids) \
+            .execute()
+        messages_by_id = {
+            row["id"]: {"content": row.get("content")}
+            for row in (message_resp.data or [])
+        }
+
+    if offender_ids:
+        offender_resp = supabase.table("profiles") \
+            .select("id, username, wallet_address") \
+            .in_("id", offender_ids) \
+            .execute()
+        offenders_by_id = {
+            row["id"]: {
+                "username": row.get("username"),
+                "wallet_address": row.get("wallet_address"),
+            }
+            for row in (offender_resp.data or [])
+        }
+
+    return [
+        {
+            **case,
+            "messages": messages_by_id.get(case.get("message_id")),
+            "offender": offenders_by_id.get(case.get("offender_id")),
+        }
+        for case in cases
+    ]
+
+
 def _sync_case_resolution(case: dict) -> tuple[dict, dict | None]:
     """
     Sync a moderation case with on-chain votes.
-    Resolves at 3/3 on-chain contract resolution or pro-actively at 2/3 majority.
+    Resolves at 3/3 on-chain contract resolution or proactively at 2/3 majority.
     Returns the possibly-updated case and the fetched chain data.
     """
     blockchain_case_id = case.get("blockchain_case_id")
@@ -100,15 +153,7 @@ def _sync_case_resolution(case: dict) -> tuple[dict, dict | None]:
             determined_decision = "dismiss"
 
     if determined_decision:
-        supabase.table("moderation_cases").update({
-            "status": "resolved",
-            "decision": determined_decision
-        }).eq("id", case["id"]).execute()
-        case = {
-            **case,
-            "status": "resolved",
-            "decision": determined_decision
-        }
+        case = finalize_case_resolution(case, determined_decision)
 
     return case, chain_data
 
@@ -120,7 +165,6 @@ def sync_vote(body: VoteSyncRequest):
     Verifies the vote on-chain, then updates the moderation case in Supabase.
     If 2+ votes agree (majority), marks the case resolved.
     """
-    # Fetch the case
     resp = supabase.table("moderation_cases").select("*").eq("id", body.case_id).single().execute()
     if not resp.data:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -132,7 +176,6 @@ def sync_vote(body: VoteSyncRequest):
         f"vote={_vote_label(body.vote)} | tx={body.tx_hash}"
     )
 
-    # First sync from chain in case this vote completed consensus.
     case, chain_case = _sync_case_resolution(case)
     if case.get("status") == "resolved":
         _log_vote_event(case, chain_case, "post-sync resolved", body.moderator_address, body.vote)
@@ -145,7 +188,6 @@ def sync_vote(body: VoteSyncRequest):
     if blockchain_case_id is None:
         raise HTTPException(status_code=400, detail="Case has no blockchain ID yet")
 
-    # Verify on-chain
     on_chain = verify_vote_on_chain(blockchain_case_id, body.moderator_address)
     if not on_chain.get("has_voted"):
         raise HTTPException(
@@ -153,23 +195,18 @@ def sync_vote(body: VoteSyncRequest):
             detail="On-chain verification failed: vote not found on blockchain"
         )
 
-    # Check current on-chain case state
     chain_case = get_case_from_chain(blockchain_case_id)
     _log_vote_event(case, chain_case, "vote recorded", body.moderator_address, body.vote)
 
     if chain_case and chain_case.get("resolved"):
-        # Contract resolved the case — determine outcome
         decision_code = chain_case.get("decision", 0)
         decision = "punish" if decision_code == 1 else "dismiss"
-        supabase.table("moderation_cases").update({
-            "status": "resolved",
-            "decision": decision
-        }).eq("id", body.case_id).execute()
+        case = finalize_case_resolution(case, decision)
         return {
             "success": True,
             "vote_recorded": True,
             "case_resolved": True,
-            "decision": decision,
+            "decision": case.get("decision"),
             "tx_hash": body.tx_hash,
             "on_chain": chain_case
         }
@@ -188,36 +225,53 @@ def sync_vote(body: VoteSyncRequest):
 def get_all_cases(status: str = None, limit: int = 20):
     """Get all moderation cases, optionally filtered by status"""
     query = supabase.table("moderation_cases") \
-        .select("*, messages:message_id(content, harmful_score, severe_score, reason), offender:offender_id(username, wallet_address, warnings)") \
+        .select(CASE_BASE_SELECT) \
         .order("created_at", desc=True) \
         .limit(limit)
-    
+
     if status:
         query = query.eq("status", status)
-    
-    resp = query.execute()
-    
+
+    try:
+        resp = query.execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load moderation cases: {e}")
+
+    cases = _hydrate_cases(resp.data or [])
+
     return {
         "success": True,
-        "count": len(resp.data or []),
-        "cases": resp.data or []
+        "count": len(cases),
+        "cases": cases
     }
 
 
 @router.get("/my-cases")
-def get_my_cases(wallet_address: str = Query(..., description="Moderator wallet address")):
+def get_my_cases(
+    wallet_address: str = Query(..., description="Moderator wallet address"),
+    include_chain: bool = Query(False, description="When true, also fetch on-chain state for each case"),
+):
     """Get cases assigned to a specific moderator wallet"""
     addr = wallet_address.lower()
-    
-    resp = supabase.table("moderation_cases") \
-        .select("*, messages:message_id(content, harmful_score, severe_score, reason), offender:offender_id(username, wallet_address, warnings)") \
-        .or_(f"moderator_1.eq.{addr},moderator_2.eq.{addr},moderator_3.eq.{addr}") \
-        .order("created_at", desc=True) \
-        .execute()
-    
-    cases = resp.data or []
-    
-    # Sync/enrich with on-chain data
+
+    try:
+        resp = supabase.table("moderation_cases") \
+            .select(CASE_BASE_SELECT) \
+            .or_(f"moderator_1.eq.{addr},moderator_2.eq.{addr},moderator_3.eq.{addr}") \
+            .order("created_at", desc=True) \
+            .execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load assigned cases: {e}")
+
+    cases = _hydrate_cases(resp.data or [])
+
+    if not include_chain:
+        return {
+            "success": True,
+            "count": len(cases),
+            "cases": cases
+        }
+
     enriched = []
     for case in cases:
         case, chain_data = _sync_case_resolution(case)
@@ -225,7 +279,7 @@ def get_my_cases(wallet_address: str = Query(..., description="Moderator wallet 
             **case,
             "on_chain": chain_data
         })
-    
+
     return {
         "success": True,
         "count": len(enriched),
@@ -236,10 +290,21 @@ def get_my_cases(wallet_address: str = Query(..., description="Moderator wallet 
 @router.get("/case/{case_id}")
 def get_case_detail(case_id: str):
     """Get full details and ensure status is synced with blockchain"""
-    resp = supabase.table("moderation_cases").select("*, messages:message_id(content, harmful_score, severe_score, reason, punishment), offender:offender_id(username, wallet_address, warnings)").eq("id", case_id).single().execute()
-    if not resp.data: raise HTTPException(status_code=404, detail="Case not found")
+    try:
+        resp = supabase.table("moderation_cases") \
+            .select(CASE_BASE_SELECT) \
+            .eq("id", case_id) \
+            .single() \
+            .execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load case detail: {e}")
+
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="Case not found")
+
     case = resp.data
     case, chain_data = _sync_case_resolution(case)
+    case = _hydrate_cases([case])[0]
     return {"success": True, "case": {**case, "on_chain": chain_data}}
 
 
@@ -247,10 +312,10 @@ def get_case_detail(case_id: str):
 def get_chain_case(blockchain_case_id: int):
     """Read case directly from blockchain"""
     data = get_case_from_chain(blockchain_case_id)
-    
+
     if not data:
         raise HTTPException(status_code=404, detail="Case not found on chain")
-    
+
     return {
         "success": True,
         "case": data
@@ -273,7 +338,7 @@ def get_moderation_stats():
         resolved = supabase.table("moderation_cases").select("id", count="exact").eq("status", "resolved").execute()
         punished = supabase.table("moderation_cases").select("id", count="exact").eq("decision", "punish").execute()
         dismissed = supabase.table("moderation_cases").select("id", count="exact").eq("decision", "dismiss").execute()
-        
+
         return {
             "success": True,
             "stats": {
@@ -291,27 +356,28 @@ def get_moderation_stats():
 @router.post("/retry-chain/{case_id}")
 def retry_blockchain_case(case_id: str):
     """Retry blockchain call for a case that failed"""
-    resp = supabase.table("moderation_cases") \
-        .select("*, messages:message_id(content)") \
-        .eq("id", case_id) \
-        .single() \
-        .execute()
-    
+    try:
+        resp = supabase.table("moderation_cases") \
+            .select(CASE_BASE_SELECT) \
+            .eq("id", case_id) \
+            .single() \
+            .execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load retry-chain case: {e}")
+
     if not resp.data:
         raise HTTPException(status_code=404, detail="Case not found")
-    
-    case = resp.data
-    
+
+    case = _hydrate_cases([resp.data])[0]
+
     if case.get("blockchain_case_id") is not None:
         raise HTTPException(status_code=400, detail="Case already has blockchain ID")
-    
-    from services.moderation import create_moderation_case
-    
+
     result = create_moderation_case(
         message_id=case["message_id"],
         user_id=case["offender_id"],
         content=case["messages"]["content"] if case.get("messages") else "",
-        severe_score=case.get("toxicity_score", 0)
+        toxicity_score=case.get("toxicity_score", 0)
     )
-    
+
     return {"success": result["success"], "result": result}

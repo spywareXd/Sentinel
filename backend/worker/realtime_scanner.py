@@ -74,7 +74,7 @@ async def scan_unprocessed():
                         message_id=msg["id"],
                         user_id=msg["user_id"],
                         content=msg["content"],
-                        severe_score=result["severe_score"],
+                        toxicity_score=result["severe_score"],
                         ai_metadata=result  # Pass the full AI analysis
                     )
                     

@@ -9,6 +9,74 @@ from services.blockchain import create_case_on_chain
 IST = timezone(timedelta(hours=5, minutes=30))
 
 
+def increment_offender_warnings(offender_id: str | None) -> None:
+    """Increment the offender warning count after a punish decision."""
+    if not offender_id:
+        return
+
+    try:
+        profile = supabase.table("profiles") \
+            .select("warnings") \
+            .eq("id", offender_id) \
+            .single() \
+            .execute()
+
+        current_warnings = (profile.data or {}).get("warnings", 0) or 0
+
+        supabase.table("profiles").update({
+            "warnings": current_warnings + 1
+        }).eq("id", offender_id).execute()
+
+        print(
+            f"Warning count for offender {offender_id}: "
+            f"{current_warnings} -> {current_warnings + 1}"
+        )
+    except Exception as e:
+        print(f"Warning increment failed for offender {offender_id}: {e}")
+
+
+def finalize_case_resolution(case: dict, decision: str) -> dict:
+    """
+    Mark a case resolved and apply resolution side effects exactly once.
+    """
+    case_id = case.get("id")
+    if not case_id:
+        return case
+
+    current_case = supabase.table("moderation_cases") \
+        .select("status, decision, offender_id") \
+        .eq("id", case_id) \
+        .single() \
+        .execute()
+
+    current_data = current_case.data or {}
+    already_resolved = current_data.get("status") == "resolved"
+    offender_id = case.get("offender_id") or current_data.get("offender_id")
+
+    if already_resolved and current_data.get("decision") == decision:
+        return {
+            **case,
+            "status": "resolved",
+            "decision": decision,
+            "offender_id": offender_id,
+        }
+
+    supabase.table("moderation_cases").update({
+        "status": "resolved",
+        "decision": decision
+    }).eq("id", case_id).execute()
+
+    if decision == "punish" and not already_resolved:
+        increment_offender_warnings(offender_id)
+
+    return {
+        **case,
+        "status": "resolved",
+        "decision": decision,
+        "offender_id": offender_id,
+    }
+
+
 def select_random_moderators(exclude_user_id: str = None, count: int = 3) -> list:
     """
     Select random moderators from profiles that have wallet_address set.
@@ -48,7 +116,7 @@ def select_random_moderators(exclude_user_id: str = None, count: int = 3) -> lis
         return []
 
 
-def create_moderation_case(message_id: str, user_id: str, content: str, severe_score: float, ai_metadata: dict = None) -> dict:
+def create_moderation_case(message_id: str, user_id: str, content: str, toxicity_score: float, ai_metadata: dict = None) -> dict:
     """
     Full flow:
     1. Select 3 random moderators
@@ -101,7 +169,7 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
                 "moderator_2": mod_wallets[1],
                 "moderator_3": mod_wallets[2],
                 "status": "insufficient_moderators",
-                "toxicity_score": severe_score,
+                "toxicity_score": toxicity_score,
                 "created_at": datetime.now(IST).isoformat()
             }
             
@@ -127,14 +195,14 @@ def create_moderation_case(message_id: str, user_id: str, content: str, severe_s
             "moderator_2": mod_wallets[1],
             "moderator_3": mod_wallets[2],
             "status": "voting",
-            "toxicity_score": severe_score,
+            "toxicity_score": toxicity_score,
             "ai_reason": ai_metadata.get("reason") if ai_metadata else None,
             "punishment_type": ai_metadata.get("punishment") if ai_metadata else None,
             "punishment_duration": ai_metadata.get("punishment_duration") if ai_metadata else 0,
             "created_at": datetime.now(IST).isoformat()
         }
         
-        print(f"Creating case in DB with toxicity_score: {severe_score}")
+        print(f"Creating case in DB with toxicity_score: {toxicity_score}")
         
         insert_resp = supabase.table("moderation_cases").insert(case_data).execute()
         
@@ -236,7 +304,7 @@ def check_and_update_resolved_cases():
                 if chain_data["resolved"]:
                     decision = "punish" if chain_data["decision"] == 1 else "dismiss"
                     print(f"[SYNC] Case {bc_id} officially resolved on-chain: {decision}")
-                    supabase.table("moderation_cases").update({"status": "resolved", "decision": decision}).eq("id", case["id"]).execute()
+                    finalize_case_resolution(case, decision)
                     continue
 
                 # --- OPTION B: Pro-active 2/3 Majority Check ---
@@ -255,10 +323,7 @@ def check_and_update_resolved_cases():
 
                 if determined_decision:
                     print(f"[SYNC] Case {bc_id} reached 2/3 majority pro-actively: {determined_decision}")
-                    supabase.table("moderation_cases").update({
-                        "status": "resolved",
-                        "decision": determined_decision
-                    }).eq("id", case["id"]).execute()
+                    finalize_case_resolution(case, determined_decision)
             except Exception as case_error:
                 print(f"   [SYNC Error] Skipping Case {case.get('blockchain_case_id', 'unknown')}: {case_error}")
                 continue

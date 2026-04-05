@@ -11,6 +11,9 @@ import type { CaseDecision, CaseRecord } from "@/types/mockdata/cases";
 import { createClient } from "@/utils/supabase/client";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+const LOCAL_BACKEND_URL = "http://localhost:8000";
+const BACKEND_CANDIDATES =
+  BACKEND_URL === LOCAL_BACKEND_URL ? [BACKEND_URL] : [BACKEND_URL, LOCAL_BACKEND_URL];
 
 type TopTab = "Assigned" | "History";
 
@@ -57,10 +60,7 @@ interface DbCase {
   decision?: string | null;
   status?: string | null;
   created_at?: string;
-  updated_at?: string;
   messages?: {
-    harmful_score?: number;
-    severe_score?: number;
     content?: string;
   };
   ai_reason?: string | null;
@@ -83,7 +83,7 @@ const mapCaseRecord = (dbCase: DbCase): CaseRecord => {
   const decision = mapDecision(dbCase.decision);
   const status = mapStatus(dbCase.status);
   const openedAt = formatTimestamp(dbCase.created_at) ?? "Recently opened";
-  const resolvedAt = formatTimestamp(dbCase.updated_at);
+  const resolvedAt = status === "Resolved" ? "Resolved" : undefined;
   const reason = dbCase.ai_reason || "flagged content";
   const offenderName =
     dbCase.offender?.username ||
@@ -208,50 +208,79 @@ export default function CasesPage() {
   useEffect(() => {
     const loadCases = async () => {
       setIsLoading(true);
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+        if (userError || !user) {
+          router.push("/login");
+          return;
+        }
 
-      if (userError || !user) {
-        router.push("/login");
-        return;
-      }
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("wallet_address")
+          .eq("id", user.id)
+          .maybeSingle();
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("wallet_address")
-        .eq("id", user.id)
-        .single();
+        const walletAddress = (
+          profile?.wallet_address ||
+          user.user_metadata?.wallet_address ||
+          ""
+        ).toLowerCase();
+        setModeratorWallet(walletAddress);
 
-      const walletAddress = profile?.wallet_address?.toLowerCase();
-      setModeratorWallet(walletAddress ?? "");
+        if (!walletAddress) {
+          setCases([]);
+          setSelectedCaseId(null);
+          return;
+        }
 
-      if (!walletAddress) {
+        let payload: { cases?: DbCase[] } | null = null;
+        let lastFailure: unknown = null;
+
+        for (const baseUrl of BACKEND_CANDIDATES) {
+          try {
+            const resp = await fetch(
+              `${baseUrl}/moderation/my-cases?wallet_address=${encodeURIComponent(walletAddress)}`,
+              {
+                cache: "no-store",
+                headers: {
+                  "bypass-tunnel-reminder": "true",
+                },
+              },
+            );
+
+            if (!resp.ok) {
+              lastFailure = await resp.text().catch(() => `HTTP ${resp.status}`);
+              continue;
+            }
+
+            payload = (await resp.json()) as { cases?: DbCase[] };
+            break;
+          } catch (err) {
+            lastFailure = err;
+          }
+        }
+
+        if (!payload) {
+          console.error("Network error loading cases:", lastFailure);
+          setCases([]);
+          setSelectedCaseId(null);
+          return;
+        }
+
+        const mappedCases = (payload.cases ?? []).map(mapCaseRecord);
+        setCases(mappedCases);
+      } catch (err) {
+        console.error("Network error loading cases:", err);
         setCases([]);
         setSelectedCaseId(null);
+      } finally {
         setIsLoading(false);
-        return;
       }
-
-      const resp = await fetch(
-        `${BACKEND_URL}/moderation/my-cases?wallet_address=${encodeURIComponent(walletAddress)}`,
-        { cache: "no-store" }
-      );
-
-      if (!resp.ok) {
-        console.error("Error loading cases:", await resp.text().catch(() => "Unknown backend error"));
-        setCases([]);
-        setSelectedCaseId(null);
-        setIsLoading(false);
-        return;
-      }
-
-      const payload = (await resp.json()) as { cases?: DbCase[] };
-      const mappedCases = (payload.cases ?? []).map(mapCaseRecord);
-      setCases(mappedCases);
-      setIsLoading(false);
     };
 
     void loadCases();
