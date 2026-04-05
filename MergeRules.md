@@ -353,6 +353,194 @@ If a punishment UI change requires guessing backend meaning, stop and add an ada
 
 If a merge makes the app more tightly coupled to raw Supabase columns across many components, back it out and centralize the mapping first.
 
+## Conflict-Resolution Checklist
+
+Use this section during the actual merge.
+
+### Step 1. Freeze the schema truth first
+
+Before accepting any incoming chunk, verify that it still respects:
+
+- `messages` = raw chat data only
+- `moderation_cases` = moderation metadata and workflow state
+- `toxicity_score` = only persisted moderation score
+
+If the incoming branch disagrees, stop and resolve around the schema first before doing anything else.
+
+### Step 2. Resolve high-risk files in this order
+
+1. `backend/api/routes/moderation.py`
+2. `backend/services/moderation.py`
+3. `backend/worker/realtime_scanner.py`
+4. `frontend/src/hooks/useMetaMaskVote.ts`
+5. `frontend/src/app/cases/page.tsx`
+6. `frontend/src/lib/punishment.ts`
+7. any new punishment-enforcement frontend files
+
+This order protects the data contract first, then the vote flow, then the UI.
+
+### Step 3. File-by-file rules
+
+#### `backend/api/routes/moderation.py`
+
+Keep:
+
+- `CASE_BASE_SELECT` rooted in `moderation_cases`
+- separate hydration of `messages.content`
+- separate hydration of offender profile info
+- structured error handling in `/moderation/vote/sync`
+- fast default behavior for `/moderation/my-cases`
+
+Reject:
+
+- nested `messages(...)` reads that pull removed moderation columns
+- any return shape that forces the frontend back onto deprecated message fields
+- any change that makes `include_chain=true` the default again
+
+#### `backend/services/moderation.py`
+
+Keep:
+
+- `create_moderation_case(..., toxicity_score, ai_metadata=...)`
+- writes to `moderation_cases.ai_reason`
+- writes to `moderation_cases.punishment_type`
+- writes to `moderation_cases.punishment_duration`
+- idempotent case finalization
+- warning increment on punish resolution
+
+Reject:
+
+- writes of moderation metadata to `messages`
+- persistence of `harmful_score` or `severe_score`
+- punishment logic that assumes recommendation fields equal active enforcement state
+
+#### `backend/worker/realtime_scanner.py`
+
+Keep:
+
+- AI `severe_score` in memory
+- mapping from AI `severe_score` to persisted `toxicity_score`
+- duplicate-case prevention against `moderation_cases`
+
+Allow:
+
+- in-memory `harmful_score` and `severe_score` for scanner logic only
+
+Reject:
+
+- database writes of `harmful_score`
+- database writes of `severe_score`
+- old inserts/selects against deprecated moderation columns
+
+#### `frontend/src/hooks/useMetaMaskVote.ts`
+
+Keep:
+
+- backend URL fallback logic
+- deployed-environment safety around `NEXT_PUBLIC_BACKEND_URL`
+- sync through `/moderation/vote/sync`
+- signer-address-based sync verification
+- structured backend error surfacing
+
+Reject:
+
+- hardcoded deployed localhost assumptions
+- reverting to one fragile backend URL path only
+- using only profile wallet instead of actual signer wallet for backend verification
+
+#### `frontend/src/app/cases/page.tsx`
+
+Keep:
+
+- mapping from `moderation_cases` fields into UI
+- `toxicity_score` as the source for current severity display
+- `punishment_type` and `punishment_duration` from `moderation_cases`
+- defensive handling when `on_chain` is absent
+
+Reject:
+
+- any `DbCase` type that expects message-level moderation columns
+- dependence on `updated_at`
+- any logic that breaks the fast cases list path
+
+#### `frontend/src/lib/punishment.ts`
+
+Keep:
+
+- defensive date parsing
+- support for either explicit expiry or derived expiry
+- graceful behavior for null and missing fields
+
+Reject:
+
+- timer logic that throws on missing timestamps
+- UI contracts that require a single backend timestamp format
+
+### Step 4. Rules for new punishment-enforcement frontend code
+
+When merging punishment application/timer work:
+
+1. Introduce one normalization layer first.
+2. Keep recommendation data separate from active enforcement data.
+3. Never let chat or moderation pages hard-fail because punishment state is missing.
+4. Prefer derived UI state such as:
+   - `isActive`
+   - `expiresAt`
+   - `remainingMs`
+   - `displayLabel`
+5. Keep raw backend field names out of leaf UI components whenever possible.
+
+### Step 5. Questions to ask on every conflict
+
+For each conflict block, ask:
+
+1. Does this reintroduce deprecated schema assumptions?
+2. Does this move moderation metadata back onto `messages`?
+3. Does this break vote sync or signer verification?
+4. Does this make Vercel deployment more fragile?
+5. Does this confuse punishment recommendation with active enforcement?
+6. Does this make timer logic less defensive?
+
+If any answer is yes, do not accept the incoming chunk as-is.
+
+### Step 6. Quick grep checklist after the merge
+
+Run these:
+
+```powershell
+rg -n "harmful_score|severe_score|messages\\.reason|messages\\.punishment|updated_at" backend frontend
+rg -n "toxicity_score|punishment_type|punishment_duration|ai_reason|blockchain_case_id" backend frontend
+rg -n "vote/sync|signerAddress|NEXT_PUBLIC_BACKEND_URL" frontend backend
+```
+
+Interpretation:
+
+- first command should only show scanner/in-memory references where appropriate
+- second command should confirm current schema-aligned usage
+- third command should confirm vote and deployment safety stayed intact
+
+### Step 7. Final merge gate
+
+Do not call the merge safe until all of these are true:
+
+1. `npx tsc --noEmit` passes in `frontend`
+2. `npm run build` passes in `frontend`
+3. `/cases` loads
+4. `/moderation/my-cases` returns valid data
+5. vote sync still works end-to-end
+6. punishment recommendation still displays
+7. new punishment timer/enforcement UI fails soft on missing data
+
+### Step 8. If uncertain, prefer containment
+
+If an incoming branch has good feature work but risky backend assumptions:
+
+- keep the feature UI
+- keep the current data adapter
+- rewire the feature into current schema-safe inputs
+
+Do not accept a broad backend regression just to preserve a feature branch wholesale.
+
 ## Reference Files
 
 Use these files as the current implementation reference during merge resolution:
