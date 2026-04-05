@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { BrowserProvider, Contract } from "ethers";
-import { getBackendCandidates, getBackendConfigError } from "../lib/backend";
 
 // Minimal ABI — only the castVote function
 const SENTINEL_ABI = [
@@ -31,6 +30,7 @@ const SENTINEL_ABI = [
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "";
 const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111 in hex
+const LOCAL_BACKEND_URL = "http://localhost:8000";
 
 export type VoteOption = "punish" | "dismiss";
 
@@ -55,6 +55,42 @@ export type UseMetaMaskVoteReturn = {
     moderatorAddress: string
   ) => Promise<void>;
   reset: () => void;
+};
+
+const isLocalHostname = (hostname: string) =>
+  hostname === "localhost" || hostname === "127.0.0.1";
+
+const normalizeUrl = (value?: string | null) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
+const getBackendCandidates = () => {
+  const configuredUrl = normalizeUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const runningLocally = isLocalHostname(hostname);
+
+  if (!configuredUrl) {
+    return runningLocally ? [LOCAL_BACKEND_URL] : [];
+  }
+
+  if (configuredUrl === LOCAL_BACKEND_URL || !runningLocally) {
+    return [configuredUrl];
+  }
+
+  return [configuredUrl, LOCAL_BACKEND_URL];
+};
+
+const getBackendConfigError = () => {
+  const configuredUrl = normalizeUrl(process.env.NEXT_PUBLIC_BACKEND_URL);
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const runningLocally = isLocalHostname(hostname);
+
+  if (configuredUrl || runningLocally) {
+    return null;
+  }
+
+  return "No public backend URL is configured in the deployed frontend bundle. Set NEXT_PUBLIC_BACKEND_URL in Vercel and redeploy.";
 };
 
 const isNetworkLikeError = (message: string) =>
